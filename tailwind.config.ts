@@ -8,8 +8,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: "#199ce0",
-        accent: "#f5991c",
+        primary: "#f5991c",
+        accent: "#199ce0",
       },
     },
   },

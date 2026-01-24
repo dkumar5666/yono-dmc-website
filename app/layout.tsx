@@ -1,5 +1,5 @@
-import WhatsAppButton from "@/components/WhatsAppButton";
 import type { Metadata } from "next";
+import { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -22,21 +22,12 @@ export const metadata: Metadata = {
   },
   description:
     "Yono DMC is a trusted travel agency in India offering customized domestic & international holiday packages including Dubai, Bali, Singapore, Malaysia and more.",
-  keywords: [
-    "travel agency in India",
-    "holiday packages",
-    "Dubai tour packages",
-    "Bali tour packages",
-    "Singapore tour packages",
-    "Malaysia tour packages",
-    "Yono DMC",
-  ],
 };
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html lang="en">
@@ -44,7 +35,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Header />
-        <main className="max-w-7xl mx-auto px-6">{children}</main>
+        <main>{children}</main>
         <Footer />
       </body>
     </html>

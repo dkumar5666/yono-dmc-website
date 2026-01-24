@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-type Props = {
+interface HolidayCardProps {
   title: string;
   description: string;
   slug: string;
-};
+}
 
-export default function HolidayCard({ title, description, slug }: Props) {
+export function HolidayCard({ title, description, slug }: HolidayCardProps) {
   return (
     <div className="border rounded-lg p-6 hover:shadow-md transition">
       <h3 className="text-xl font-semibold mb-2">{title}</h3>

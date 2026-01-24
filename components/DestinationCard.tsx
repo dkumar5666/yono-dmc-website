@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Destination } from "@/data/mockData";
 
-type Props = {
+interface Props {
   destination: Destination;
-};
+}
 
 export default function DestinationCard({ destination }: Props) {
   return (

@@ -3,18 +3,18 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: '/:path*',
+        source: "/:path*",
         has: [
           {
-            type: 'host',
-            value: 'yonodmc.in',
+            type: "host",
+            value: "yonodmc.in",
           },
         ],
-        destination: 'https://www.yonodmc.in/:path*',
-        permanent: true, // 301 redirect
+        destination: "https://www.yonodmc.in/:path*",
+        permanent: true,
       },
     ];
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

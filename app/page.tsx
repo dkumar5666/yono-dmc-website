@@ -10,8 +10,8 @@ import {
 } from "@/data/mockData";
 
 import PackageCard from "@/components/PackageCard";
-import { DestinationCard } from "@/components/DestinationCard";
-import { WhatsAppButton } from "@/components/WhatsAppButton";
+import DestinationCard from "@/components/DestinationCard";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 
 import {

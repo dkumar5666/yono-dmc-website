@@ -88,9 +88,9 @@ export default function PackagesPage() {
               </label>
               <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500">
                 <option>All Budgets</option>
-                <option>Under ₹40,000</option>
-                <option>₹40,000 – ₹60,000</option>
-                <option>Above ₹60,000</option>
+                <option>Under &#8377;40,000</option>
+                <option>&#8377;40,000 - &#8377;60,000</option>
+                <option>Above &#8377;60,000</option>
               </select>
             </div>
 
@@ -133,3 +133,5 @@ export default function PackagesPage() {
     </div>
   );
 }
+
+

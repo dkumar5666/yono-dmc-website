@@ -1,4 +1,13 @@
-export const holidays = [
+export interface Holiday {
+  slug: string;
+  title: string;
+  description: string;
+  image: string;
+  itinerary?: string[];
+  priceFrom?: string;
+}
+
+export const holidays: Holiday[] = [
   {
     slug: "dubai",
     title: "Dubai Holiday Packages",

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Destination } from "@/data/mockData";
 
@@ -10,10 +11,12 @@ export default function DestinationCard({ destination }: Props) {
   return (
     <Link href="/packages" className="group block">
       <div className="relative h-80 rounded-2xl overflow-hidden shadow-lg">
-        <img
+        <Image
           src={destination.image}
           alt={destination.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          className="object-cover group-hover:scale-110 transition-transform duration-500"
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />

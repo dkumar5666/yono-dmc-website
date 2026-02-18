@@ -7,7 +7,7 @@ interface WhatsAppButtonProps {
   fixed?: boolean;
 }
 
-export function WhatsAppButton({ text = 'Chat on WhatsApp', className = '', fixed = false }: WhatsAppButtonProps) {
+function WhatsAppButton({ text = 'Chat on WhatsApp', className = '', fixed = false }: WhatsAppButtonProps) {
   const baseClasses = 'inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white px-6 py-3 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl';
   const fixedClasses = fixed ? 'fixed bottom-6 right-6 z-50 animate-pulse' : '';
   
@@ -23,3 +23,6 @@ export function WhatsAppButton({ text = 'Chat on WhatsApp', className = '', fixe
     </a>
   );
 }
+
+export default WhatsAppButton;
+export { WhatsAppButton };

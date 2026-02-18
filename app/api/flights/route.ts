@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json(response.result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("FLIGHT API ERROR:", error);
     return NextResponse.json(
       { error: "Flight API failed" },

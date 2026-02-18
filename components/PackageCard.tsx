@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Check } from "lucide-react";
 import { Package } from "@/data/mockData";
 
@@ -10,10 +11,12 @@ export default function PackageCard({ package: pkg }: Props) {
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition group">
       <div className="relative h-56 overflow-hidden">
-        <img
+        <Image
           src={pkg.image}
           alt={pkg.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+          className="object-cover group-hover:scale-110 transition"
         />
         <span className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-sm">
           {pkg.duration}
@@ -37,13 +40,13 @@ export default function PackageCard({ package: pkg }: Props) {
           <div>
             <p className="text-sm text-gray-500">Starting from</p>
             <p className="text-2xl font-bold text-blue-900">
-              ₹{pkg.price.toLocaleString("en-IN")}
+              &#8377;{pkg.price.toLocaleString("en-IN")}
             </p>
           </div>
 
           <Link
-  href={`/holidays/${pkg.slug}`}
-  className="bg-primary text-white px-5 py-2.5 rounded-lg"
+            href={`/holidays/${pkg.slug}`}
+            className="bg-primary text-white px-5 py-2.5 rounded-lg"
           >
             View Details
           </Link>
@@ -52,3 +55,4 @@ export default function PackageCard({ package: pkg }: Props) {
     </div>
   );
 }
+

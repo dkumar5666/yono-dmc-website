@@ -33,10 +33,10 @@ export default function DestinationsPage() {
         {/* ================= CTA ================= */}
         <div className="bg-teal-500 text-white rounded-2xl p-8 text-center">
           <h2 className="text-3xl font-bold mb-4">
-            Can't Find Your Dream Destination?
+            Can&apos;t Find Your Dream Destination?
           </h2>
           <p className="text-xl mb-6">
-            Tell us where you want to go and we'll create a custom
+            Tell us where you want to go and we&apos;ll create a custom
             package for you
           </p>
           <WhatsAppButton

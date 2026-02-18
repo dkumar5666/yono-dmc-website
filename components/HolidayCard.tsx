@@ -6,7 +6,7 @@ interface HolidayCardProps {
   slug: string;
 }
 
-export function HolidayCard({ title, description, slug }: HolidayCardProps) {
+function HolidayCard({ title, description, slug }: HolidayCardProps) {
   return (
     <div className="border rounded-lg p-6 hover:shadow-md transition">
       <h3 className="text-xl font-semibold mb-2">{title}</h3>
@@ -16,8 +16,12 @@ export function HolidayCard({ title, description, slug }: HolidayCardProps) {
         href={`/holidays/${slug}`}
         className="text-primary font-medium hover:underline"
       >
-        Get Best Price →
+        Get Best Price &rarr;
       </Link>
     </div>
   );
 }
+
+export default HolidayCard;
+export { HolidayCard };
+

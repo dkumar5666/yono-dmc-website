@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   packages,
   destinations,
@@ -10,7 +11,6 @@ import {
 } from "@/data/mockData";
 
 import PackageCard from "@/components/PackageCard";
-import DestinationCard from "@/components/DestinationCard";
 import WhatsAppButton from "@/components/WhatsAppButton";
 
 
@@ -32,12 +32,13 @@ export default function HomePage() {
       {/* ================= HERO ================= */}
       <section className="relative h-[600px] flex items-center justify-center">
         <div className="absolute inset-0">
-            src="https://images.unsplash.com/photo-1768069794857-9306ac167c6e"
+          <Image
+            src="/api/images/hero"
             alt="Hero"
             fill
             className="object-cover"
             priority
-         {'>'}
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-blue-900/90 to-teal-900/80" />
         </div>
 
@@ -46,7 +47,7 @@ export default function HomePage() {
             Customized International Holidays by Trusted DMC
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-gray-200">
-            Dubai • Singapore • Malaysia • Bali
+            Dubai &middot; Singapore &middot; Malaysia &middot; Bali
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -64,8 +65,68 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ================= TOP DESTINATIONS ================= */}
+      <section className="bg-gray-100 py-16 md:py-20">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-slate-900 mb-10 md:mb-12">
+            Top Destinations
+          </h2>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+            {destinations.map((d) => (
+              <div
+                key={`home-destination-${d.id}`}
+                className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="relative h-40 md:h-44">
+                  <Image
+                    src={d.image}
+                    alt={d.name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="p-4 md:p-5">
+                  <h3 className="text-3xl md:text-2xl font-semibold text-slate-900 mb-2 leading-none md:leading-tight">
+                    {d.name}
+                  </h3>
+                  <Link
+                    href={`/holidays/${d.name.toLowerCase()}`}
+                    className="text-blue-600 font-medium hover:text-blue-700 text-lg md:text-base"
+                  >
+                    View Packages &rarr;
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= PACKAGES ================= */}
+      <section
+        id="packages"
+        className="max-w-7xl mx-auto px-4 py-20"
+      >
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold mb-4">
+            Popular Holiday Packages
+          </h2>
+          <p className="text-gray-600">
+            Handpicked international destinations just for you
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {packages.map((pkg) => (
+            <PackageCard key={pkg.id} package={pkg} />
+          ))}
+        </div>
+      </section>
+
       {/* ================= QUICK ENQUIRY ================= */}
-      <section className="max-w-7xl mx-auto px-4 -mt-20 relative z-20">
+      <section className="max-w-7xl mx-auto px-4 pb-12">
         <div className="bg-white rounded-2xl shadow-2xl p-6">
           <div className="flex gap-4 mb-6 border-b">
             {(["holidays", "flights", "hotels", "visa"] as const).map((tab) => (
@@ -94,47 +155,6 @@ export default function HomePage() {
               <Search className="w-5 h-5" />
               Get Best Price
             </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= PACKAGES ================= */}
-      <section
-        id="packages"
-        className="max-w-7xl mx-auto px-4 py-20"
-      >
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">
-            Popular Holiday Packages
-          </h2>
-          <p className="text-gray-600">
-            Handpicked international destinations just for you
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {packages.map((pkg) => (
-            <PackageCard key={pkg.id} package={pkg} />
-          ))}
-        </div>
-      </section>
-
-      {/* ================= DESTINATIONS ================= */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">
-              Top Destinations
-            </h2>
-            <p className="text-gray-600">
-              Explore the world's most beautiful places
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {destinations.map((d) => (
-              <DestinationCard key={d.id} destination={d} />
-            ))}
           </div>
         </div>
       </section>
@@ -178,7 +198,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
               <div key={t.id} className="bg-white/10 p-6 rounded-2xl">
-                <p className="italic mb-4">"{t.comment}"</p>
+                <p className="italic mb-4">&ldquo;{t.comment}&rdquo;</p>
                 <p className="font-semibold">{t.name}</p>
                 <p className="text-sm opacity-80">{t.location}</p>
               </div>
@@ -191,3 +211,4 @@ export default function HomePage() {
     </div>
   );
 }
+

@@ -12,6 +12,8 @@ export default function ContactPage() {
     subject: "",
     message: "",
   });
+  type FormField = keyof typeof formData;
+  const formFields: FormField[] = ["name", "email", "phone", "subject"];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +37,12 @@ export default function ContactPage() {
         >
           <h2 className="text-2xl font-bold mb-4">Send Us a Message</h2>
 
-          {["name", "email", "phone", "subject"].map((field) => (
+          {formFields.map((field) => (
             <input
               key={field}
               required
               placeholder={field.toUpperCase()}
-              value={(formData as any)[field]}
+              value={formData[field]}
               onChange={(e) =>
                 setFormData({ ...formData, [field]: e.target.value })
               }
@@ -69,7 +71,7 @@ export default function ContactPage() {
             { icon: <Phone />, text: "+91 98765 43210" },
             { icon: <Mail />, text: "info@yonodmc.in" },
             { icon: <MapPin />, text: "Mumbai, Maharashtra" },
-            { icon: <Clock />, text: "Mon–Sat: 9 AM – 7 PM" },
+            { icon: <Clock />, text: "Mon-Sat: 9 AM - 7 PM" },
           ].map((i, idx) => (
             <div key={idx} className="bg-white p-6 rounded-xl shadow flex gap-4">
               <div className="w-12 h-12 bg-teal-100 text-teal-600 flex items-center justify-center rounded-lg">
@@ -85,3 +87,4 @@ export default function ContactPage() {
     </div>
   );
 }
+

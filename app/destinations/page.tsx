@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import DestinationCard from "@/components/DestinationCard";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import { Destination, destinations as seedDestinations } from "@/data/mockData";
+import { holidays } from "@/data/holidays";
+
+function toSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 export default function DestinationsPage() {
   const [destinations, setDestinations] = useState<Destination[]>(seedDestinations);
@@ -23,6 +32,12 @@ export default function DestinationsPage() {
     })();
   }, []);
 
+  const packageCountByCountry = holidays.reduce<Record<string, number>>((acc, item) => {
+    const key = toSlug(item.country);
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ================= HERO ================= */}
@@ -40,12 +55,19 @@ export default function DestinationsPage() {
       {/* ================= DESTINATIONS GRID ================= */}
       <section className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {destinations.map((destination) => (
+          {destinations.map((destination) => {
+            const country = destination.country ?? destination.name;
+            const slug = toSlug(country);
+            const packageCount = packageCountByCountry[slug] ?? destination.packages;
+
+            return (
             <DestinationCard
               key={destination.id}
-              destination={destination}
+              destination={{ ...destination, packages: packageCount }}
+              href={`/destinations/${slug}`}
             />
-          ))}
+            );
+          })}
         </div>
 
         {/* ================= CTA ================= */}

@@ -17,13 +17,16 @@ export default function HolidaysPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {holidays.map((item) => (
-  <HolidayCard
-    key={item.slug}
-    title={item.title}
-    description={item.description}
-    slug={item.slug}
-  />
-))}
+          <HolidayCard
+            key={item.slug}
+            title={item.title}
+            description={item.description}
+            slug={item.slug}
+            duration={item.duration}
+            priceFrom={item.priceFrom}
+            image={item.image}
+          />
+        ))}
       </div>
     </section>
   );

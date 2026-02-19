@@ -7,7 +7,7 @@ export default function AboutPage() {
       <section className="bg-blue-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            About YONO DMC
+            About Yono DMC
           </h1>
           <p className="text-xl text-gray-300">
             Your trusted partner for international travel
@@ -20,7 +20,7 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold mb-6">Who We Are</h2>
           <div className="space-y-4 text-gray-700 text-lg">
             <p>
-              YONO DMC is a leading Destination Management Company specializing
+              Yono DMC is a leading Destination Management Company specializing
               in unforgettable international holidays for Indian travelers.
             </p>
             <p>

@@ -25,6 +25,13 @@ const allowedPackageTypes: Package["type"][] = [
   "adventure",
 ];
 
+const defaultCitiesByDestination: Record<string, string[]> = {
+  malaysia: ["Genting Highlands", "Penang", "Langkawi"],
+  singapore: ["Singapore City", "Sentosa"],
+  bali: ["Ubud", "Kuta", "Nusa Dua"],
+  dubai: ["Dubai", "Abu Dhabi"],
+};
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -35,6 +42,11 @@ function toSlug(value: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function destinationImageFromName(name: string): string {
+  const key = toSlug(name) || "hero";
+  return `/api/images/${key}`;
 }
 
 function normalizeImagePath(raw: unknown): string {
@@ -97,12 +109,36 @@ function normalizeDestination(
 ): Destination {
   const name = String(input.name ?? "").trim() || `Destination ${index + 1}`;
   const packages = Number(input.packages ?? 0);
+  const country = String(input.country ?? "").trim() || name;
+  const cities = Array.isArray(input.cities)
+    ? input.cities.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const tagline = String(input.tagline ?? "Explore this destination");
+  const defaultCities = defaultCitiesByDestination[name.toLowerCase()] ?? [];
+  const fallbackCities =
+    cities.length > 0
+      ? cities
+      : defaultCities.length > 0
+        ? defaultCities
+        : tagline
+            .split(/,|&|\//)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .slice(0, 3);
 
   return {
     id: String(input.id ?? crypto.randomUUID()),
     name,
-    tagline: String(input.tagline ?? "Explore this destination"),
-    image: normalizeImagePath(input.image),
+    country,
+    cities: fallbackCities.length > 0 ? fallbackCities : [name],
+    tagline,
+    image: (() => {
+      const normalizedImage = normalizeImagePath(input.image || destinationImageFromName(name));
+      if (normalizedImage === "/api/images/hero") {
+        return destinationImageFromName(name);
+      }
+      return normalizedImage;
+    })(),
     packages: Number.isFinite(packages) && packages >= 0 ? packages : 0,
   };
 }

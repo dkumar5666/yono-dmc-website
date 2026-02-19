@@ -8,10 +8,12 @@
 
 html {
   scroll-behavior: smooth;
+  font-size: 16px;
 }
 
 body {
-  @apply bg-white text-gray-800 antialiased;
+  @apply bg-white text-gray-800 antialiased leading-relaxed;
+  font-family: var(--font-poppins), sans-serif;
 }
 
 /* =========================
@@ -19,10 +21,10 @@ body {
 ========================= */
 
 :root {
-  --color-primary: #f5991c;    /* Blue (Hero / Trust section) */
-  --color-secondary: #199ce0;  /* Teal (CTA band) */
-  --color-accent: #22c55e;    /* Green (WhatsApp CTA) */
-  --color-warning: #f91616;   /* Orange (Price / Buttons) */
+  --color-primary: #f5991c;
+  --color-secondary: #199ce0;
+  --color-accent: #22c55e;
+  --color-warning: #f91616;
 }
 
 /* =========================
@@ -58,5 +60,81 @@ body {
   /* Section Container */
   .container {
     @apply max-w-7xl mx-auto px-6;
+  }
+}
+
+/* =========================
+   BRAND COLOR MAPPING
+========================= */
+
+@layer utilities {
+  .bg-blue-900 {
+    background-color: var(--color-secondary) !important;
+  }
+
+  .text-blue-900 {
+    color: var(--color-secondary) !important;
+  }
+
+  .bg-blue-50 {
+    background-color: color-mix(in srgb, var(--color-secondary) 12%, white) !important;
+  }
+
+  .text-blue-600,
+  .text-blue-700 {
+    color: var(--color-secondary) !important;
+  }
+
+  .hover\:text-blue-700:hover {
+    color: var(--color-secondary) !important;
+    opacity: 0.85;
+  }
+
+  .bg-teal-500,
+  .bg-teal-600,
+  .bg-teal-700 {
+    background-color: var(--color-primary) !important;
+  }
+
+  .text-teal-400,
+  .text-teal-500,
+  .text-teal-600,
+  .text-teal-700 {
+    color: var(--color-primary) !important;
+  }
+
+  .border-teal-500,
+  .border-teal-600 {
+    border-color: var(--color-primary) !important;
+  }
+
+  .bg-teal-50,
+  .bg-teal-100 {
+    background-color: color-mix(in srgb, var(--color-primary) 14%, white) !important;
+  }
+
+  .from-teal-500,
+  .from-teal-600 {
+    --tw-gradient-from: var(--color-primary) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: color-mix(in srgb, var(--color-primary) 0%, transparent)
+      var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .to-teal-600,
+  .to-teal-900\/80 {
+    --tw-gradient-to: var(--color-primary) var(--tw-gradient-to-position) !important;
+  }
+
+  .from-blue-900\/90 {
+    --tw-gradient-from: color-mix(in srgb, var(--color-secondary) 90%, transparent)
+      var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: color-mix(in srgb, var(--color-secondary) 0%, transparent)
+      var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .focus\:ring-teal-500:focus {
+    --tw-ring-color: var(--color-primary) !important;
   }
 }

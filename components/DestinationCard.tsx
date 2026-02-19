@@ -5,11 +5,18 @@ import { Destination } from "@/data/mockData";
 
 interface Props {
   destination: Destination;
+  href?: string;
 }
 
-export default function DestinationCard({ destination }: Props) {
+export default function DestinationCard({ destination, href }: Props) {
+  const country = destination.country ?? destination.name;
+  const cities =
+    destination.cities && destination.cities.length > 0
+      ? destination.cities.join(", ")
+      : destination.tagline;
+
   return (
-    <Link href="/packages" className="group block">
+    <Link href={href ?? "/holidays"} className="group block">
       <div className="relative h-80 rounded-2xl overflow-hidden shadow-lg">
         <Image
           src={destination.image}
@@ -23,8 +30,10 @@ export default function DestinationCard({ destination }: Props) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
         <div className="absolute bottom-0 p-6 text-white w-full">
-          <h3 className="text-3xl font-bold mb-2">{destination.name}</h3>
-          <p className="text-gray-200 mb-3">{destination.tagline}</p>
+          <h3 className="text-3xl font-bold mb-1">{country}</h3>
+          <p className="text-gray-200 mb-3 text-sm">
+            <span className="font-semibold">Cities:</span> {cities}
+          </p>
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-300">

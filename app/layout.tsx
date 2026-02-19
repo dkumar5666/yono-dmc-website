@@ -1,23 +1,20 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
+  weight: ["300", "400", "500", "600", "700", "800"],
+  style: ["normal"],
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: "--font-poppins",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Yono DMC – Trusted Travel Agency in India",
+    default: "Yono DMC - Trusted Travel Agency in India",
     template: "%s | Yono DMC",
   },
   description:
@@ -31,9 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${poppins.variable} font-sans antialiased`}>
         <Header />
         <main>{children}</main>
         <Footer />

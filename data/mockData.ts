@@ -1,4 +1,4 @@
-// Mock data for YONO DMC website
+// Mock data for Yono DMC website
 
 export interface Package {
   id: string;
@@ -15,6 +15,8 @@ export interface Package {
 export interface Destination {
   id: string;
   name: string;
+  country?: string;
+  cities?: string[];
   tagline: string;
   image: string;
   packages: number;
@@ -80,6 +82,8 @@ export const destinations: Destination[] = [
   {
     id: '1',
     name: 'Dubai',
+    country: 'UAE',
+    cities: ['Dubai', 'Abu Dhabi'],
     tagline: 'Where Luxury Meets Adventure',
     image: '/api/images/dubai',
     packages: 12
@@ -87,6 +91,8 @@ export const destinations: Destination[] = [
   {
     id: '2',
     name: 'Bali',
+    country: 'Indonesia',
+    cities: ['Bali', 'Ubud', 'Kuta'],
     tagline: 'Island Paradise Awaits',
     image: '/api/images/bali',
     packages: 10
@@ -94,6 +100,8 @@ export const destinations: Destination[] = [
   {
     id: '3',
     name: 'Singapore',
+    country: 'Singapore',
+    cities: ['Singapore City', 'Sentosa'],
     tagline: 'The Garden City Experience',
     image: '/api/images/singapore',
     packages: 8
@@ -101,6 +109,8 @@ export const destinations: Destination[] = [
   {
     id: '4',
     name: 'Malaysia',
+    country: 'Malaysia',
+    cities: ['Genting Highlands', 'Penang', 'Langkawi'],
     tagline: 'Truly Asia Experience',
     image: '/api/images/malaysia',
     packages: 9
@@ -113,7 +123,7 @@ export const testimonials: Testimonial[] = [
     name: 'Rajesh & Priya Sharma',
     location: 'Mumbai',
     rating: 5,
-    comment: 'Amazing Dubai trip! Everything was perfectly organized. YONO DMC took care of every detail. Highly recommend!',
+    comment: 'Amazing Dubai trip! Everything was perfectly organized. Yono DMC took care of every detail. Highly recommend!',
     image: '/api/images/testimonial'
   },
   {
@@ -121,7 +131,7 @@ export const testimonials: Testimonial[] = [
     name: 'Amit & Sneha Patel',
     location: 'Ahmedabad',
     rating: 5,
-    comment: 'Our Bali honeymoon was a dream come true! Thank you YONO DMC for making it so special and hassle-free.',
+    comment: 'Our Bali honeymoon was a dream come true! Thank you Yono DMC for making it so special and hassle-free.',
     image: '/api/images/testimonial'
   },
   {

@@ -83,7 +83,7 @@ export function buildBookingConfirmedNotification(
     pnrLine +
     ticketLine +
     `Amount Paid: ${amountLine(booking)}\n` +
-    `Thank you for booking with YONO DMC.`;
+    `Thank you for booking with Yono DMC.`;
 
   return {
     event: "booking_confirmed",

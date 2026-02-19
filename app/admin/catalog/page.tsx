@@ -283,6 +283,12 @@ export default function AdminCatalogPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/admin/destinations" className="text-slate-200 hover:text-white">
+              Destinations Module
+            </Link>
+            <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
+              Holiday Builder
+            </Link>
             <Link href="/" className="text-slate-200 hover:text-white">
               Back to site
             </Link>

@@ -12,7 +12,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: "Home", path: "/" },
-    { name: "Packages", path: "/packages" },
+    { name: "Holidays", path: "/holidays" },
     { name: "Destinations", path: "/destinations" },
     { name: "Flights", path: "/flights" },
     { name: "Hotels", path: "/hotels" },
@@ -30,8 +30,8 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <div className="text-3xl font-bold">
-              <span className="text-blue-900">YONO</span>
-              <span className="text-teal-500">DMC</span>
+              <span className="text-blue-900">Yono</span>
+              <span className="text-teal-500"> DMC</span>
             </div>
           </Link>
 

@@ -85,8 +85,6 @@ export default function DestinationsPage() {
           />
         </div>
       </section>
-
-      <WhatsAppButton fixed />
     </div>
   );
 }

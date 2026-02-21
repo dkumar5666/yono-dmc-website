@@ -47,10 +47,10 @@ export default function Header() {
 
         <div className="flex items-center gap-4">
           <Link
-            href="/admin/login"
+            href="/login"
             className="hidden md:inline-flex bg-[#199ce0] text-white px-4 py-2 rounded-full text-[17px] font-semibold hover:opacity-90"
           >
-            Login / Signup
+            Login
           </Link>
           <a
             href="https://wa.me/919958839319"

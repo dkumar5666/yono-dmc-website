@@ -10,10 +10,11 @@ interface Props {
 
 export default function DestinationCard({ destination, href }: Props) {
   const country = destination.country ?? destination.name;
-  const cities =
-    destination.cities && destination.cities.length > 0
-      ? destination.cities.join(", ")
-      : destination.tagline;
+  const hasCities = Boolean(destination.cities && destination.cities.length > 0);
+  const detailLabel = hasCities ? "Cities" : "Tagline";
+  const detailValue = hasCities
+    ? (destination.cities ?? []).join(", ")
+    : destination.tagline;
 
   return (
     <Link href={href ?? "/holidays"} className="group block">
@@ -32,7 +33,7 @@ export default function DestinationCard({ destination, href }: Props) {
         <div className="absolute bottom-0 p-6 text-white w-full">
           <h3 className="text-3xl font-bold mb-1">{country}</h3>
           <p className="text-gray-200 mb-3 text-sm">
-            <span className="font-semibold">Cities:</span> {cities}
+            <span className="font-semibold">{detailLabel}:</span> {detailValue}
           </p>
 
           <div className="flex items-center justify-between">

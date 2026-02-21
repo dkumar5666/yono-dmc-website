@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
         onSubmit={onSubmit}
         className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-4"
       >
-        <h1 className="text-2xl font-bold">Admin Login</h1>
+        <h1 className="text-2xl font-bold">Office Staff / Admin Login</h1>
         <p className="text-sm text-gray-600">
           Sign in to manage destinations and holiday packages.
         </p>

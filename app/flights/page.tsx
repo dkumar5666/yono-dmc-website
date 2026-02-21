@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import WhatsAppButton from "@/components/WhatsAppButton";
 import { Plane, Info, Loader2, CheckCircle2 } from "lucide-react";
 
 type FlightSegmentSummary = {
@@ -485,8 +484,6 @@ export default function FlightsPage() {
           </div>
         ) : null}
       </section>
-
-      <WhatsAppButton fixed />
     </div>
   );
 }

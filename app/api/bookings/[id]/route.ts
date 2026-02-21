@@ -35,9 +35,9 @@ interface BookingPatchBody {
 }
 
 const bookingStatuses: BookingStatus[] = [
-  "initiated",
+  "draft",
   "pending_payment",
-  "payment_received",
+  "paid",
   "confirmed",
   "failed",
   "cancelled",

@@ -9,9 +9,9 @@ import { requireAdmin } from "@/lib/backend/adminAuth";
 import { validateBookingPayload } from "@/lib/backend/validation";
 
 const bookingStatuses: BookingStatus[] = [
-  "initiated",
+  "draft",
   "pending_payment",
-  "payment_received",
+  "paid",
   "confirmed",
   "failed",
   "cancelled",
@@ -43,19 +43,29 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Partial<BookingPayload>;
+    const safeOfferSnapshot =
+      body.offerSnapshot && typeof body.offerSnapshot === "object"
+        ? body.offerSnapshot
+        : null;
     const payload: BookingPayload = {
       type: "flight",
-      offerId: body.offerId ?? "",
-      offerSnapshot: body.offerSnapshot ?? null,
+      offerId: (body.offerId ?? "").trim(),
+      offerSnapshot: safeOfferSnapshot,
       amount: body.amount ?? 0,
-      currency: body.currency ?? "INR",
+      currency: (body.currency ?? "INR").toUpperCase().slice(0, 5),
       contact: {
-        name: body.contact?.name ?? "",
-        email: body.contact?.email ?? "",
-        phone: body.contact?.phone ?? "",
+        name: (body.contact?.name ?? "").trim(),
+        email: (body.contact?.email ?? "").trim().toLowerCase(),
+        phone: (body.contact?.phone ?? "").trim(),
       },
-      travelers: body.travelers ?? [],
-      notes: body.notes,
+      travelers: (body.travelers ?? []).map((traveler) => ({
+        firstName: traveler.firstName?.trim() ?? "",
+        lastName: traveler.lastName?.trim() ?? "",
+        dob: traveler.dob?.trim(),
+        gender: traveler.gender,
+        passportNumber: traveler.passportNumber?.trim(),
+      })),
+      notes: body.notes?.trim().slice(0, 1000),
     };
 
     const validationError = validateBookingPayload(payload);

@@ -72,6 +72,12 @@ Admin auth header:
 
 - `POST /api/payments/intent` create payment intent
 - `POST /api/payments/confirm` confirm payment and booking
+- `POST /api/payments/webhook` webhook skeleton (signature header: `x-payment-signature`)
+
+Booking lifecycle statuses:
+
+- `draft -> pending_payment -> paid -> confirmed`
+- terminal states: `failed`, `cancelled`
 
 ### Runtime storage
 

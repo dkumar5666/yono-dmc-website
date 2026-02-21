@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import WhatsAppButton from "@/components/WhatsAppButton";
 import { Phone, Mail, MapPin, Clock, Send } from "lucide-react";
 
 export default function ContactPage() {
@@ -82,8 +81,6 @@ export default function ContactPage() {
           ))}
         </div>
       </section>
-
-      <WhatsAppButton fixed />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   BookingListFilters,
   BookingPayload,
   BookingRecord,
+  BookingStatusEvent,
   BookingStatus,
   BookingStatusTransitionResult,
   PaymentIntentRecord,
@@ -26,9 +27,9 @@ function nowIso(): string {
 }
 
 const statusTransitions: Record<BookingStatus, BookingStatus[]> = {
-  initiated: ["pending_payment", "failed", "cancelled"],
-  pending_payment: ["payment_received", "confirmed", "failed", "cancelled"],
-  payment_received: ["confirmed", "failed", "cancelled"],
+  draft: ["pending_payment", "cancelled", "failed"],
+  pending_payment: ["paid", "confirmed", "failed", "cancelled"],
+  paid: ["confirmed", "failed", "cancelled"],
   confirmed: ["cancelled"],
   failed: [],
   cancelled: [],
@@ -40,6 +41,52 @@ function canTransitionStatus(
 ): boolean {
   if (current === next) return true;
   return statusTransitions[current].includes(next);
+}
+
+function normalizeLegacyStatus(status: string): BookingStatus {
+  if (status === "initiated") return "draft";
+  if (status === "payment_received") return "paid";
+  if (
+    status === "draft" ||
+    status === "pending_payment" ||
+    status === "paid" ||
+    status === "confirmed" ||
+    status === "failed" ||
+    status === "cancelled"
+  ) {
+    return status;
+  }
+  return "draft";
+}
+
+function timestampFieldByStatus(status: BookingStatus): keyof BookingRecord | null {
+  if (status === "draft") return "draftAt";
+  if (status === "pending_payment") return "pendingPaymentAt";
+  if (status === "paid") return "paidAt";
+  if (status === "confirmed") return "confirmedAt";
+  if (status === "failed") return "failedAt";
+  if (status === "cancelled") return "cancelledAt";
+  return null;
+}
+
+function normalizeBookingRecord(record: BookingRecord): BookingRecord {
+  const normalizedStatus = normalizeLegacyStatus(record.status);
+  if (normalizedStatus === record.status) return record;
+  return {
+    ...record,
+    status: normalizedStatus,
+  };
+}
+
+function appendStatusEvent(
+  booking: BookingRecord,
+  status: BookingStatus,
+  at: string
+): BookingStatusEvent[] {
+  const existing = booking.statusTimeline ?? [];
+  const last = existing[existing.length - 1];
+  if (last && last.status === status) return existing;
+  return [...existing, { status, at }];
 }
 
 function createBookingReference(): string {
@@ -86,13 +133,15 @@ export async function createBooking(payload: BookingPayload): Promise<BookingRec
       id: crypto.randomUUID(),
       reference: createBookingReference(),
       type: payload.type,
-      status: "initiated",
+      status: "draft",
       amount: payload.amount,
       currency: payload.currency,
       contact: payload.contact,
       travelers: payload.travelers,
       offerId: payload.offerId,
       offerSnapshot: payload.offerSnapshot,
+      draftAt: timestamp,
+      statusTimeline: [{ status: "draft", at: timestamp }],
       notes: payload.notes,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -108,7 +157,7 @@ export async function listBookings(
   filters?: BookingListFilters
 ): Promise<BookingRecord[]> {
   const db = await readDb();
-  let bookings = db.bookings.slice();
+  let bookings = db.bookings.map(normalizeBookingRecord);
 
   if (filters?.status) {
     bookings = bookings.filter((booking) => booking.status === filters.status);
@@ -139,7 +188,8 @@ export async function listBookings(
 
 export async function getBookingById(id: string): Promise<BookingRecord | null> {
   const db = await readDb();
-  return db.bookings.find((booking) => booking.id === id) ?? null;
+  const booking = db.bookings.find((item) => item.id === id);
+  return booking ? normalizeBookingRecord(booking) : null;
 }
 
 export async function updateBookingStatus(
@@ -152,12 +202,17 @@ export async function updateBookingStatus(
     const index = db.bookings.findIndex((booking) => booking.id === id);
     if (index < 0) return null;
 
-    const current = db.bookings[index];
+    const current = normalizeBookingRecord(db.bookings[index]);
+    const timestamp = nowIso();
+    const stampField = timestampFieldByStatus(status);
+    const statusTimeline = appendStatusEvent(current, status, timestamp);
     const updated: BookingRecord = {
       ...current,
       ...extra,
       status,
-      updatedAt: nowIso(),
+      ...(stampField ? { [stampField]: timestamp } : {}),
+      statusTimeline,
+      updatedAt: timestamp,
     };
 
     db.bookings[index] = updated;
@@ -175,7 +230,7 @@ export async function updateBookingFields(
     const index = db.bookings.findIndex((booking) => booking.id === id);
     if (index < 0) return null;
 
-    const current = db.bookings[index];
+    const current = normalizeBookingRecord(db.bookings[index]);
     const updated: BookingRecord = {
       ...current,
       ...extra,

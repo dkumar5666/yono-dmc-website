@@ -5,6 +5,7 @@ import {
   transitionBookingStatus,
   updatePaymentStatus,
 } from "@/lib/backend/store";
+import { getPaymentProvider } from "@/lib/backend/paymentProvider";
 import {
   buildBookingConfirmedNotification,
   sendNotificationStub,
@@ -40,23 +41,55 @@ export async function POST(req: Request) {
         message: "Booking already confirmed",
       });
     }
+    if (booking.status === "cancelled" || booking.status === "failed") {
+      return NextResponse.json(
+        { error: `Cannot confirm payment for ${booking.status} booking` },
+        { status: 400 }
+      );
+    }
 
     const paymentIntent = await getPaymentIntentById(paymentIntentId);
     if (!paymentIntent || paymentIntent.bookingId !== bookingId) {
       return NextResponse.json({ error: "Payment intent not found" }, { status: 404 });
     }
+    if (paymentIntent.status === "succeeded" && booking.status === "paid") {
+      return NextResponse.json({
+        paymentIntent,
+        booking,
+        message: "Payment already marked as successful",
+      });
+    }
+
+    const provider = getPaymentProvider();
+    const providerResult = await provider.confirmPayment({
+      bookingId,
+      paymentIntent,
+      providerPaymentId: providerPaymentId || undefined,
+    });
+    if (providerResult.status !== "succeeded") {
+      await updatePaymentStatus(paymentIntentId, "failed", providerResult.providerPaymentId);
+      const failedTransition = await transitionBookingStatus(booking.id, "failed");
+      return NextResponse.json(
+        {
+          error: "Payment failed",
+          paymentIntentId,
+          booking: failedTransition.booking,
+        },
+        { status: 402 }
+      );
+    }
 
     const updatedPayment = await updatePaymentStatus(
       paymentIntentId,
       "succeeded",
-      providerPaymentId || undefined
+      providerResult.providerPaymentId
     );
 
     const paidTransition = await transitionBookingStatus(
       booking.id,
-      "payment_received",
+      "paid",
       {
-        providerPaymentId: providerPaymentId || booking.providerPaymentId,
+        providerPaymentId: providerResult.providerPaymentId || booking.providerPaymentId,
       }
     );
     if (!paidTransition.booking) {
@@ -67,7 +100,7 @@ export async function POST(req: Request) {
     }
 
     const confirmTransition = await transitionBookingStatus(booking.id, "confirmed", {
-      providerPaymentId: providerPaymentId || booking.providerPaymentId,
+      providerPaymentId: providerResult.providerPaymentId || booking.providerPaymentId,
     });
     if (!confirmTransition.booking) {
       return NextResponse.json(

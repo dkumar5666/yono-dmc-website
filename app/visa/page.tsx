@@ -176,8 +176,6 @@ export default function VisaPage() {
           </div>
         </div>
       </section>
-
-      <WhatsAppButton fixed />
     </div>
   );
 }

@@ -42,12 +42,18 @@ export interface FlightOfferSummary {
 
 export type BookingType = "flight";
 export type BookingStatus =
-  | "initiated"
+  | "draft"
   | "pending_payment"
-  | "payment_received"
+  | "paid"
   | "confirmed"
   | "failed"
   | "cancelled";
+
+export interface BookingStatusEvent {
+  status: BookingStatus;
+  at: string;
+  note?: string;
+}
 
 export interface BookingContact {
   name: string;
@@ -93,6 +99,12 @@ export interface BookingRecord {
   issuedBy?: string;
   cancellationReason?: string;
   cancelledAt?: string;
+  draftAt?: string;
+  pendingPaymentAt?: string;
+  paidAt?: string;
+  confirmedAt?: string;
+  failedAt?: string;
+  statusTimeline?: BookingStatusEvent[];
   notes?: string;
   createdAt: string;
   updatedAt: string;

@@ -9,7 +9,7 @@ interface Props {
 
 export default function PackageCard({ package: pkg }: Props) {
   return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition group">
+    <Link href={`/holidays/${pkg.slug}`} className="block bg-white rounded-2xl shadow-md hover:shadow-xl transition group">
       <div className="relative h-56 overflow-hidden">
         <Image
           src={pkg.image}
@@ -45,15 +45,12 @@ export default function PackageCard({ package: pkg }: Props) {
             </p>
           </div>
 
-          <Link
-            href={`/holidays/${pkg.slug}`}
-            className="bg-primary text-white px-5 py-2.5 rounded-lg"
-          >
+          <span className="bg-primary text-white px-5 py-2.5 rounded-lg">
             View Details
-          </Link>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

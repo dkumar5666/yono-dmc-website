@@ -31,7 +31,7 @@ async function fetchPexelsImage(query: string): Promise<string | null> {
 
   const data = (await response.json()) as PexelsResponse;
   const photo = data.photos?.[0]?.src;
-  return photo?.large2x ?? photo?.large ?? photo?.landscape ?? photo?.original ?? null;
+  return photo?.landscape ?? photo?.large ?? photo?.large2x ?? photo?.original ?? null;
 }
 
 async function fetchImageBinary(url: string): Promise<Response | null> {

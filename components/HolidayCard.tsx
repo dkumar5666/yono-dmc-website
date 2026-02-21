@@ -19,7 +19,10 @@ function HolidayCard({
   image,
 }: HolidayCardProps) {
   return (
-    <div className="overflow-hidden border rounded-lg hover:shadow-md transition bg-white">
+    <Link
+      href={`/holidays/${slug}`}
+      className="block overflow-hidden border rounded-lg hover:shadow-md transition bg-white"
+    >
       <div className="relative h-48 w-full">
         <Image src={image} alt={title} fill className="object-cover" />
       </div>
@@ -29,14 +32,11 @@ function HolidayCard({
       <p className="text-sm text-gray-700 mb-1">{duration}</p>
       <p className="text-sm font-semibold text-teal-700 mb-4">{priceFrom}</p>
 
-      <Link
-        href={`/holidays/${slug}`}
-        className="text-primary font-medium hover:underline"
-      >
+      <span className="text-primary font-medium hover:underline">
         Get Best Price &rarr;
-      </Link>
+      </span>
       </div>
-    </div>
+    </Link>
   );
 }
 

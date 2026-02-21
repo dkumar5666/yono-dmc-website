@@ -130,10 +130,15 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2">
                 <MapPin className="w-7 h-7 mt-0.5 shrink-0" />
-                <span className="text-base">
+                <a
+                  href="https://share.google/5epho29t1iMGwnbUz"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-base hover:underline"
+                >
                   Unit No. 259, 2nd Floor, Tower No. B1, SPAZE ITECH PARK,
                   Badshahpur Sohna Rd, Sector 49, Gurugram, Haryana 122018
-                </span>
+                </a>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-7 h-7 shrink-0" />

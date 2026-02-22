@@ -1,16 +1,18 @@
 import Link from "next/link";
 
 interface AttractionsPageProps {
-  searchParams?: Promise<{
-    destination?: string;
-  }>;
+  searchParams?: {
+    destination?: string | string[];
+  };
 }
 
-export default async function AttractionsPage({
-  searchParams,
-}: AttractionsPageProps) {
-  const params = (await searchParams) ?? {};
-  const destination = params.destination ?? "your destination";
+function readParam(value: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(value)) return value[0] ?? fallback;
+  return value ?? fallback;
+}
+
+export default function AttractionsPage({ searchParams }: AttractionsPageProps) {
+  const destination = readParam(searchParams?.destination, "your destination");
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -35,4 +37,3 @@ export default async function AttractionsPage({
     </main>
   );
 }
-

@@ -1,18 +1,22 @@
 import Link from "next/link";
 
 interface HotelsPageProps {
-  searchParams?: Promise<{
-    destination?: string;
-    date?: string;
-    travelers?: string;
-  }>;
+  searchParams?: {
+    destination?: string | string[];
+    date?: string | string[];
+    travelers?: string | string[];
+  };
 }
 
-export default async function HotelsPage({ searchParams }: HotelsPageProps) {
-  const params = (await searchParams) ?? {};
-  const destination = params.destination ?? "your destination";
-  const date = params.date ?? "any date";
-  const travelers = params.travelers ?? "2 travelers, 1 room";
+function readParam(value: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(value)) return value[0] ?? fallback;
+  return value ?? fallback;
+}
+
+export default function HotelsPage({ searchParams }: HotelsPageProps) {
+  const destination = readParam(searchParams?.destination, "your destination");
+  const date = readParam(searchParams?.date, "any date");
+  const travelers = readParam(searchParams?.travelers, "2 travelers, 1 room");
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -38,4 +42,3 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
     </main>
   );
 }
-

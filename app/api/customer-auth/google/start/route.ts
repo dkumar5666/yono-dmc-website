@@ -6,6 +6,7 @@ import {
   sanitizeNextPath,
 } from "@/lib/backend/customerAuth";
 import { apiError } from "@/lib/backend/http";
+import { consumeRateLimit, getClientIp } from "@/lib/backend/rateLimit";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -14,6 +15,20 @@ function appBaseUrl(req: Request): string {
 }
 
 export async function GET(req: Request) {
+  const ip = getClientIp(req);
+  const limit = consumeRateLimit(`google-oauth-start:${ip}`, 30, 15 * 60 * 1000);
+  if (!limit.ok) {
+    const response = apiError(
+      req,
+      429,
+      "RATE_LIMITED",
+      "Too many login attempts. Try again later.",
+      { retryAfterSeconds: limit.retryAfterSeconds }
+    );
+    response.headers.set("retry-after", String(limit.retryAfterSeconds));
+    return response;
+  }
+
   const requestUrl = new URL(req.url);
   const nextPath = sanitizeNextPath(requestUrl.searchParams.get("next"));
 

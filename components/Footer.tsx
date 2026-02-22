@@ -33,7 +33,7 @@ export default function Footer() {
             </p>
             <div className="flex gap-5">
               <a
-                className="hover:text-teal-400 transition-colors"
+                className="text-[#199ce0] hover:text-[#f5991c] transition-colors"
                 href="https://www.facebook.com/yonodmc.in"
                 target="_blank"
                 rel="noreferrer"
@@ -41,7 +41,7 @@ export default function Footer() {
                 <Facebook className="w-7 h-7" />
               </a>
               <a
-                className="hover:text-teal-400 transition-colors"
+                className="text-[#199ce0] hover:text-[#f5991c] transition-colors"
                 href="https://www.instagram.com/yonodmc/"
                 target="_blank"
                 rel="noreferrer"
@@ -49,7 +49,7 @@ export default function Footer() {
                 <Instagram className="w-7 h-7" />
               </a>
               <a
-                className="hover:text-teal-400 transition-colors"
+                className="text-[#199ce0] hover:text-[#f5991c] transition-colors"
                 href="https://x.com/yonodmc"
                 target="_blank"
                 rel="noreferrer"
@@ -58,7 +58,7 @@ export default function Footer() {
                 <Twitter className="w-7 h-7" />
               </a>
               <a
-                className="hover:text-teal-400 transition-colors"
+                className="text-[#199ce0] hover:text-[#f5991c] transition-colors"
                 href="https://www.threads.com/@yonodmc"
                 target="_blank"
                 rel="noreferrer"
@@ -67,7 +67,7 @@ export default function Footer() {
                 <AtSign className="w-7 h-7" />
               </a>
               <a
-                className="hover:text-teal-400 transition-colors"
+                className="text-[#199ce0] hover:text-[#f5991c] transition-colors"
                 href="https://www.youtube.com/@yonodmcc"
                 target="_blank"
                 rel="noreferrer"
@@ -85,13 +85,13 @@ export default function Footer() {
                 <Link href="/">Home</Link>
               </li>
               <li>
-                <Link href="/holidays">Holidays</Link>
+                <Link href="/holidays">Packages</Link>
               </li>
               <li>
                 <Link href="/flights">Flights</Link>
               </li>
               <li>
-                <Link href="/hotels">Hotels</Link>
+                <Link href="/hotels">Stays</Link>
               </li>
               <li>
                 <Link href="/visa">Visa Services</Link>
@@ -113,13 +113,22 @@ export default function Footer() {
                 <Link href="/customer-reviews">Customer Reviews</Link>
               </li>
               <li>
+                <Link href="/feedback">Survey & Feedback</Link>
+              </li>
+              <li>
                 <Link href="/about">About Us</Link>
               </li>
               <li>
-                <Link href="/contact">Contact</Link>
+                <Link href="/contact">Contact Us</Link>
               </li>
               <li>
                 <Link href="/privacy-policy">Privacy Policy</Link>
+              </li>
+              <li>
+                <Link href="/terms-and-conditions">Terms & Conditions</Link>
+              </li>
+              <li>
+                <Link href="/cookie-policy">Cookie Policy</Link>
               </li>
             </ul>
           </div>
@@ -129,7 +138,7 @@ export default function Footer() {
             <h3 className="text-white font-semibold text-xl mb-4">Contact Us</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-2">
-                <MapPin className="w-7 h-7 mt-0.5 shrink-0" />
+                <MapPin className="w-7 h-7 mt-0.5 shrink-0 text-[#199ce0]" />
                 <a
                   href="https://share.google/5epho29t1iMGwnbUz"
                   target="_blank"
@@ -141,7 +150,7 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="w-7 h-7 shrink-0" />
+                <MapPin className="w-7 h-7 shrink-0 text-[#199ce0]" />
                 <a
                   href="https://share.google/5epho29t1iMGwnbUz"
                   target="_blank"
@@ -151,11 +160,11 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="w-7 h-7 shrink-0" />
+                <Phone className="w-7 h-7 shrink-0 text-[#f5991c]" />
                 <a href="tel:+919958839319">+91 99588 39319</a>
               </li>
               <li className="flex items-center gap-2">
-                <Mail className="w-7 h-7 shrink-0" />
+                <Mail className="w-7 h-7 shrink-0 text-[#f5991c]" />
                 <a href="mailto:info@yonodmc.in">info@yonodmc.in</a>
               </li>
             </ul>
@@ -165,7 +174,11 @@ export default function Footer() {
         <div className="border-t border-gray-800 pt-8 text-center text-base">
           <p>&copy; {new Date().getFullYear()} Yono DMC. All rights reserved.</p>
           <div className="mt-2">
+            <Link href="/terms-and-conditions">Terms & Conditions</Link>
+            <span className="mx-2">|</span>
             <Link href="/privacy-policy">Privacy Policy</Link>
+            <span className="mx-2">|</span>
+            <Link href="/cookie-policy">Cookie Policy</Link>
             <span className="mx-2">|</span>
             <Link href="/refund-policy">Refund Policy</Link>
           </div>

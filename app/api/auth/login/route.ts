@@ -5,6 +5,7 @@ import {
   authenticateCredentials,
   createSessionToken,
 } from "@/lib/backend/sessionAuth";
+import { consumeRateLimit, getClientIp } from "@/lib/backend/rateLimit";
 
 interface LoginBody {
   username?: string;
@@ -13,6 +14,17 @@ interface LoginBody {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const limit = consumeRateLimit(`admin-login:${ip}`, 10, 15 * 60 * 1000);
+    if (!limit.ok) {
+      const response = NextResponse.json(
+        { error: "Too many login attempts. Try again later." },
+        { status: 429 }
+      );
+      response.headers.set("retry-after", String(limit.retryAfterSeconds));
+      return response;
+    }
+
     if (!areAuthUsersConfigured()) {
       return NextResponse.json(
         { error: "Auth users are not configured in environment" },

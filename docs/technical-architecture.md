@@ -167,6 +167,21 @@ Optional destination city model:
 
 ---
 
+## 8.1 Security Guardrails
+- API rate limiting (in-memory, per-IP and per-identifier where relevant):
+  - `/api/auth/login`
+  - `/api/customer-auth/google/start`
+  - `/api/customer-auth/otp/send`
+  - `/api/customer-auth/otp/verify`
+  - `/api/customer-auth/password/forgot/verify`
+  - `/api/customer-auth/password/forgot/reset`
+- Cookie flags validated for auth/session cookies:
+  - `httpOnly: true`
+  - `sameSite: "lax"`
+  - `secure: NODE_ENV === "production"`
+
+---
+
 ## 9. Environment Variables Checklist
 
 ### Required (Core)
@@ -234,4 +249,3 @@ Optional destination city model:
 - Add rate limiting for OTP endpoints
 - Add retry + fallback strategy for image API fetch failures
 - Add end-to-end tests for auth and booking-critical flows
-

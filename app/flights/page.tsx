@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plane, Info, Loader2, CheckCircle2 } from "lucide-react";
 
 type FlightSegmentSummary = {
@@ -51,7 +52,8 @@ const initialSearch = {
   travelClass: "ECONOMY",
 };
 
-export default function FlightsPage() {
+function FlightsPageContent() {
+  const searchParams = useSearchParams();
   const [searchForm, setSearchForm] = useState(initialSearch);
   const [offers, setOffers] = useState<FlightOfferSummary[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<FlightOfferSummary | null>(null);
@@ -86,8 +88,7 @@ export default function FlightsPage() {
     );
   }, [contact, selectedOffer, traveler]);
 
-  async function handleSearchFlights(e: FormEvent) {
-    e.preventDefault();
+  async function runFlightSearch(payload: typeof initialSearch) {
     setError(null);
     setBusyStep("search");
     setBooking(null);
@@ -98,11 +99,11 @@ export default function FlightsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: searchForm.from.toUpperCase(),
-          to: searchForm.to.toUpperCase(),
-          date: searchForm.date,
-          adults: searchForm.adults,
-          travelClass: searchForm.travelClass,
+          from: payload.from.toUpperCase(),
+          to: payload.to.toUpperCase(),
+          date: payload.date,
+          adults: payload.adults,
+          travelClass: payload.travelClass,
           currency: "INR",
           max: 10,
         }),
@@ -131,6 +132,30 @@ export default function FlightsPage() {
       setBusyStep(null);
     }
   }
+
+  async function handleSearchFlights(e: FormEvent) {
+    e.preventDefault();
+    await runFlightSearch(searchForm);
+  }
+
+  useEffect(() => {
+    const from = (searchParams.get("from") ?? "").toUpperCase();
+    const to = (searchParams.get("to") ?? "").toUpperCase();
+    const date = searchParams.get("date") ?? "";
+    const adults = Number(searchParams.get("adults") ?? "1");
+
+    if (!from || !to || !date) return;
+
+    const nextSearch = {
+      ...initialSearch,
+      from,
+      to,
+      date,
+      adults: Number.isFinite(adults) && adults > 0 ? adults : 1,
+    };
+    setSearchForm(nextSearch);
+    void runFlightSearch(nextSearch);
+  }, [searchParams]);
 
   async function handleCreateBooking() {
     if (!selectedOffer || !canCreateBooking) return;
@@ -485,5 +510,13 @@ export default function FlightsPage() {
         ) : null}
       </section>
     </div>
+  );
+}
+
+export default function FlightsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <FlightsPageContent />
+    </Suspense>
   );
 }

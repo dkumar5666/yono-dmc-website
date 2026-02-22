@@ -2,6 +2,7 @@ import { createPasswordResetToken } from "@/lib/backend/passwordReset";
 import { getCustomerByPhone } from "@/lib/backend/customerStore";
 import { apiError, apiSuccess } from "@/lib/backend/http";
 import { logError } from "@/lib/backend/logger";
+import { consumeRateLimit, getClientIp } from "@/lib/backend/rateLimit";
 import {
   checkOtpVerifyAllowed,
   markOtpVerifyFailure,
@@ -29,6 +30,20 @@ function normalizeMobile(input: string): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const ipLimit = consumeRateLimit(`forgot-verify-ip:${ip}`, 30, 15 * 60 * 1000);
+    if (!ipLimit.ok) {
+      const response = apiError(
+        req,
+        429,
+        "RATE_LIMITED",
+        "Too many verification attempts. Try again later.",
+        { retryAfterSeconds: ipLimit.retryAfterSeconds }
+      );
+      response.headers.set("retry-after", String(ipLimit.retryAfterSeconds));
+      return response;
+    }
+
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
@@ -53,6 +68,19 @@ export async function POST(req: Request) {
         "OTP_INPUT_REQUIRED",
         "Mobile number and OTP code are required."
       );
+    }
+
+    const mobileLimit = consumeRateLimit(`forgot-verify-mobile:${to}`, 12, 15 * 60 * 1000);
+    if (!mobileLimit.ok) {
+      const response = apiError(
+        req,
+        429,
+        "RATE_LIMITED",
+        "Too many verification attempts for this number. Try again later.",
+        { retryAfterSeconds: mobileLimit.retryAfterSeconds }
+      );
+      response.headers.set("retry-after", String(mobileLimit.retryAfterSeconds));
+      return response;
     }
 
     const verifyAllowed = checkOtpVerifyAllowed(to);
@@ -131,4 +159,3 @@ export async function POST(req: Request) {
     return apiError(req, 500, "FORGOT_PASSWORD_VERIFY_ERROR", "Failed to verify OTP.");
   }
 }
-

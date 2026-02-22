@@ -48,7 +48,7 @@ async function fetchImageBinary(url: string): Promise<Response | null> {
     status: 200,
     headers: {
       "content-type": contentType,
-      "cache-control": "public, max-age=43200, s-maxage=43200",
+      "cache-control": "public, max-age=43200, s-maxage=43200, stale-while-revalidate=86400",
     },
   });
 }

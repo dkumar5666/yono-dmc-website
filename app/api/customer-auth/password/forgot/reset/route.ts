@@ -3,6 +3,7 @@ import { updateCustomerPassword } from "@/lib/backend/customerStore";
 import { apiError, apiSuccess } from "@/lib/backend/http";
 import { logError } from "@/lib/backend/logger";
 import { hashPassword, validatePasswordStrength } from "@/lib/backend/password";
+import { consumeRateLimit, getClientIp } from "@/lib/backend/rateLimit";
 
 interface ResetPasswordBody {
   resetToken?: string;
@@ -11,6 +12,20 @@ interface ResetPasswordBody {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const limit = consumeRateLimit(`forgot-reset-ip:${ip}`, 20, 15 * 60 * 1000);
+    if (!limit.ok) {
+      const response = apiError(
+        req,
+        429,
+        "RATE_LIMITED",
+        "Too many reset attempts. Try again later.",
+        { retryAfterSeconds: limit.retryAfterSeconds }
+      );
+      response.headers.set("retry-after", String(limit.retryAfterSeconds));
+      return response;
+    }
+
     const body = (await req.json()) as ResetPasswordBody;
     const resetToken = (body.resetToken ?? "").trim();
     const newPassword = (body.newPassword ?? "").trim();
@@ -48,4 +63,3 @@ export async function POST(req: Request) {
     return apiError(req, 500, "FORGOT_PASSWORD_RESET_ERROR", "Failed to reset password.");
   }
 }
-

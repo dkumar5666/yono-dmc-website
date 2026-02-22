@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Smartphone, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Smartphone, ShieldCheck } from "lucide-react";
 
 type AuthMode = "login" | "signup" | "forgot";
 
@@ -259,183 +260,225 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-lg bg-white/90 backdrop-blur border border-white rounded-3xl shadow-xl p-8 space-y-6">
-        <div className="space-y-2">
-          <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-            Secure Access
-          </span>
-          <h1 className="text-3xl font-bold text-slate-900">Login / Signup</h1>
-          <p className="text-sm text-slate-600">{modeSubtitle()}</p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-100 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setOtpSent(false);
-              setOtp("");
-              setMobile("");
-              resetForgotState();
-              clearAlerts();
-            }}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              mode === "login" ? "bg-white shadow text-slate-900" : "text-slate-500"
-            }`}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signup");
-              setOtpSent(false);
-              setOtp("");
-              resetForgotState();
-              clearAlerts();
-            }}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              mode === "signup" ? "bg-white shadow text-slate-900" : "text-slate-500"
-            }`}
-          >
-            Signup
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("forgot");
-              setOtpSent(false);
-              setOtp("");
-              resetForgotState();
-              clearAlerts();
-            }}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              mode === "forgot" ? "bg-white shadow text-slate-900" : "text-slate-500"
-            }`}
-          >
-            Forgot
-          </button>
-        </div>
-
-        {mode === "login" && (
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-800 hover:bg-slate-50 inline-flex items-center justify-center gap-2 transition"
-          >
-            <Mail className="h-4 w-4" />
-            Login with Gmail
-          </button>
-        )}
-
-        <form onSubmit={getFormSubmitHandler()} className="space-y-3">
-          {mode === "signup" && (
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <div className="max-w-md mx-auto flex items-center justify-center">
+          <Link href="/" aria-label="Yono DMC home" className="inline-flex">
+            <Image
+              src="/logo.png"
+              alt="Yono DMC"
+              width={200}
+              height={60}
+              className="h-14 w-auto"
+              priority
             />
-          )}
-
-          <input
-            type="tel"
-            placeholder="Mobile Number (with country code if needed)"
-            value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            required
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          />
-
-          {otpSent && !resetToken && (
-            <div className="space-y-2">
-              <input
-                type="text"
-                placeholder="Enter OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                required
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
-              <button
-                type="button"
-                onClick={() => void sendOtpRequest()}
-                disabled={busy || cooldownSeconds > 0}
-                className="text-sm font-semibold text-blue-700 disabled:text-gray-400"
-              >
-                {cooldownSeconds > 0
-                  ? `Resend OTP in ${cooldownSeconds}s`
-                  : "Resend OTP"}
-              </button>
-            </div>
-          )}
-
-          {mode === "forgot" && resetToken && (
-            <div className="space-y-2">
-              <input
-                type="password"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
-              <input
-                type="password"
-                placeholder="Confirm New Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
-              <p className="text-xs text-slate-500">
-                Use at least 8 characters with uppercase, lowercase, and number.
-              </p>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className={`w-full text-white rounded-xl px-4 py-3 font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2 transition ${
-              otpSent ? "bg-[#199ce0] hover:opacity-90" : "bg-[#f5991c] hover:opacity-90"
-            }`}
-          >
-            {otpSent ? <ShieldCheck className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
-            {busy
-              ? "Please wait..."
-              : mode === "forgot" && resetToken
-                ? "Set New Password"
-                : otpSent
-                ? "Verify OTP"
-                : mode === "forgot"
-                  ? "Send OTP for Recovery"
-                  : mode === "signup"
-                    ? "Send OTP for Signup"
-                    : "Login with Mobile OTP"}
-          </button>
-        </form>
-
-        <div className="text-sm pt-1">
-          <Link href="/" className="inline-flex items-center gap-2 text-blue-700 hover:underline">
-            <ArrowLeft className="h-4 w-4" />
-            Back to website
           </Link>
         </div>
 
-        {error ? (
-          <p className="text-sm text-red-700 rounded-lg bg-red-50 border border-red-100 px-3 py-2">
-            {error}
+        <div className="mt-6 max-w-md mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm px-8 py-7">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {mode === "forgot"
+              ? "Reset your password"
+              : otpSent && !resetToken
+                ? "Let's confirm your mobile"
+                : "Sign in or create an account"}
+          </h1>
+          <p className="text-sm text-slate-600 mt-2">{modeSubtitle()}</p>
+
+          {mode === "login" && !otpSent && (
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="mt-6 w-full bg-[#199ce0] text-white rounded-xl px-4 py-3 font-semibold inline-flex items-center justify-center gap-3 hover:opacity-90 transition"
+            >
+              <span className="h-8 w-8 rounded-lg bg-white text-[#199ce0] font-bold inline-flex items-center justify-center">
+                G
+              </span>
+              Sign in with Google
+            </button>
+          )}
+
+          <div className="flex items-center gap-3 text-xs text-slate-400 my-6">
+            <span className="h-px flex-1 bg-slate-200" />
+            or
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <form onSubmit={getFormSubmitHandler()} className="space-y-3">
+            {mode === "signup" && (
+              <input
+                type="text"
+                placeholder="Full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            )}
+
+            <input
+              type="tel"
+              placeholder="Mobile number"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              required
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+
+            {otpSent && !resetToken && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="6-digit code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => void sendOtpRequest()}
+                  disabled={busy || cooldownSeconds > 0}
+                  className="text-sm font-semibold text-blue-700 disabled:text-gray-400"
+                >
+                  {cooldownSeconds > 0
+                    ? `Request another code in ${cooldownSeconds}s`
+                    : "Request another code"}
+                </button>
+              </div>
+            )}
+
+            {mode === "forgot" && resetToken && (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full text-white rounded-xl px-4 py-3 font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2 bg-[#199ce0] hover:opacity-90 transition"
+            >
+              {otpSent ? (
+                <ShieldCheck className="h-4 w-4" />
+              ) : (
+                <Smartphone className="h-4 w-4" />
+              )}
+              {busy
+                ? "Please wait..."
+                : mode === "forgot" && resetToken
+                  ? "Set new password"
+                  : otpSent
+                    ? "Continue"
+                    : mode === "forgot"
+                      ? "Send code"
+                      : mode === "signup"
+                        ? "Create account"
+                        : "Continue"}
+            </button>
+          </form>
+
+          <div className="mt-4 text-sm text-slate-600 space-y-2">
+            {mode === "login" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setOtpSent(false);
+                    setOtp("");
+                    resetForgotState();
+                    clearAlerts();
+                  }}
+                  className="text-blue-700 font-semibold"
+                >
+                  New here? Create an account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("forgot");
+                    setOtpSent(false);
+                    setOtp("");
+                    resetForgotState();
+                    clearAlerts();
+                  }}
+                  className="block text-blue-700 font-semibold"
+                >
+                  Forgot password?
+                </button>
+              </>
+            )}
+            {mode === "signup" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setOtpSent(false);
+                  setOtp("");
+                  setMobile("");
+                  resetForgotState();
+                  clearAlerts();
+                }}
+                className="text-blue-700 font-semibold"
+              >
+                Already have an account? Sign in
+              </button>
+            )}
+            {mode === "forgot" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setOtpSent(false);
+                  setOtp("");
+                  resetForgotState();
+                  clearAlerts();
+                }}
+                className="text-blue-700 font-semibold"
+              >
+                Back to sign in
+              </button>
+            )}
+          </div>
+
+          {error ? (
+            <p className="mt-4 text-sm text-red-700 rounded-lg bg-red-50 border border-red-100 px-3 py-2">
+              {error}
+            </p>
+          ) : null}
+          {message ? (
+            <p className="mt-4 text-sm text-green-700 rounded-lg bg-green-50 border border-green-100 px-3 py-2">
+              {message}
+            </p>
+          ) : null}
+
+          <p className="mt-6 text-xs text-slate-500">
+            By continuing, you agree to our Terms & Conditions and Privacy
+            Policy.
           </p>
-        ) : null}
-        {message ? (
-          <p className="text-sm text-green-700 rounded-lg bg-green-50 border border-green-100 px-3 py-2">
-            {message}
-          </p>
-        ) : null}
+          <div className="mt-6 text-sm">
+            <Link href="/" className="inline-flex items-center gap-2 text-blue-700 font-semibold">
+              <ArrowLeft className="h-4 w-4" />
+              Back to website
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

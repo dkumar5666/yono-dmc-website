@@ -10,13 +10,13 @@ Status keys:
 ---
 
 ## Today Focus (Update Every Morning)
-- Date: 2026-02-20
-- Day Target: Day 3 - Booking Engine Backbone
+- Date: 2026-02-22
+- Day Target: Day 5 - Launch Readiness + Hard QA
 - Top 3 Priorities:
-  - 1. Booking status/state machine hardening
-  - 2. Payment intent/confirm contract cleanup
-  - 3. Provider abstraction + webhook skeleton
-- Expected Output by EOD: Day 3 API contracts stable and board updated
+  - 1. Security guardrails (rate limiting + auth hardening)
+  - 2. Performance and cleanup checks
+  - 3. Deployment readiness checks + status tracking
+- Expected Output by EOD: Day 5 baseline hardened and verified with lint/build
 - Known Risks/Blockers: Missing `NEXTAUTH_URL`, `NEXTAUTH_SECRET`
 
 ---
@@ -150,12 +150,12 @@ Status keys:
 - [ ] Validate copy, labels, and brand naming consistency
 
 ### B. Security + Guardrails
-- [ ] Add rate limit on login and OTP endpoints
-- [ ] Validate cookie flags (`httpOnly`, `sameSite`, `secure` in prod)
-- [ ] Validate input sanitization on all mutation endpoints
+- [x] Add rate limit on login and OTP endpoints
+- [x] Validate cookie flags (`httpOnly`, `sameSite`, `secure` in prod)
+- [x] Validate input sanitization on all mutation endpoints
 
 ### C. Performance
-- [ ] Validate image route caching strategy
+- [x] Validate image route caching strategy
 - [ ] Remove dead imports/components/routes
 - [ ] Quick Lighthouse baseline for Home + key pages
 
@@ -167,9 +167,9 @@ Status keys:
 - [ ] Footer/header critical links
 
 ### E. Deployment Prep
-- [ ] Prepare staging env vars
-- [ ] Run production build
-- [ ] Prepare rollback plan and release notes
+- [~] Prepare staging env vars
+- [x] Run production build
+- [x] Prepare rollback plan and release notes
 
 ### EOD Exit Criteria
 - [ ] Staging build stable
@@ -190,9 +190,9 @@ Status keys:
 ---
 
 ## Mandatory Daily Ritual (Do Not Skip)
-- [ ] Morning: update this board before coding
+- [x] Morning: update this board before coding
 - [ ] Midday: mark blockers with `[!]`
-- [ ] Evening: run lint/build + commit + push
+- [~] Evening: run lint/build + commit + push
 - [ ] End day: update docs touched today
 
 ---

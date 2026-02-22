@@ -282,6 +282,8 @@ export default function HolidayBuilderPage() {
           <div className="flex gap-3 text-sm">
             <Link href="/admin/catalog" className="text-slate-200 hover:text-white">Catalog Admin</Link>
             <Link href="/admin/destinations" className="text-slate-200 hover:text-white">Destinations</Link>
+            <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">Blog Posts</Link>
+            <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">AI Conversations</Link>
           </div>
         </div>
       </section>

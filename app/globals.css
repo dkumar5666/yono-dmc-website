@@ -68,6 +68,45 @@ body {
 ========================= */
 
 @layer utilities {
+  /* =========================
+     GLOBAL DENSITY PRESET
+     Tightens high-spacing utilities site-wide
+  ========================= */
+  .py-20 {
+    padding-top: 3.5rem !important;
+    padding-bottom: 3.5rem !important;
+  }
+
+  .py-16 {
+    padding-top: 2.75rem !important;
+    padding-bottom: 2.75rem !important;
+  }
+
+  .p-8 {
+    padding: 1.5rem !important;
+  }
+
+  .gap-8 {
+    gap: 1.25rem !important;
+  }
+
+  .mb-12 {
+    margin-bottom: 2rem !important;
+  }
+
+  .mb-10 {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .mt-10 {
+    margin-top: 1.5rem !important;
+  }
+
+  .py-12 {
+    padding-top: 2.25rem !important;
+    padding-bottom: 2.25rem !important;
+  }
+
   .bg-blue-900 {
     background-color: var(--color-secondary) !important;
   }

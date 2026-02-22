@@ -289,6 +289,12 @@ export default function AdminCatalogPage() {
             <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
               Holiday Builder
             </Link>
+            <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">
+              Blog Posts
+            </Link>
+            <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">
+              AI Conversations
+            </Link>
             <Link href="/" className="text-slate-200 hover:text-white">
               Back to site
             </Link>

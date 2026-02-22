@@ -61,3 +61,11 @@
   - `{NEXTAUTH_URL}/api/customer-auth/google/callback`
 - Twilio Verify must have an active Verify Service SID:
   - starts with `VA...`
+
+## Staging Readiness Notes
+- Target staging host: `demo.yonodmc.com`
+- Pending before staging auth can be validated:
+  - `NEXTAUTH_URL=https://demo.yonodmc.com`
+  - `NEXTAUTH_SECRET=<strong-random-value>`
+- Razorpay webhook URL should be configured after first staging deploy:
+  - `https://demo.yonodmc.com/api/payments/webhook`

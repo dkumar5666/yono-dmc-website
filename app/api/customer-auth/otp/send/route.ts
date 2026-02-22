@@ -1,6 +1,7 @@
 import { apiError, apiSuccess } from "@/lib/backend/http";
 import { logError } from "@/lib/backend/logger";
 import { checkOtpSendAllowed, markOtpSent } from "@/lib/backend/otpGuard";
+import { consumeRateLimit, getClientIp } from "@/lib/backend/rateLimit";
 
 const TWILIO_VERIFY_API_BASE = "https://verify.twilio.com/v2";
 
@@ -18,6 +19,20 @@ function normalizeMobile(input: string): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const ipLimit = consumeRateLimit(`otp-send-ip:${ip}`, 20, 15 * 60 * 1000);
+    if (!ipLimit.ok) {
+      const response = apiError(
+        req,
+        429,
+        "RATE_LIMITED",
+        "Too many OTP requests. Try again later.",
+        { retryAfterSeconds: ipLimit.retryAfterSeconds }
+      );
+      response.headers.set("retry-after", String(ipLimit.retryAfterSeconds));
+      return response;
+    }
+
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
@@ -40,6 +55,19 @@ export async function POST(req: Request) {
         "MOBILE_REQUIRED",
         "Mobile number is required."
       );
+    }
+
+    const mobileLimit = consumeRateLimit(`otp-send-mobile:${to}`, 8, 15 * 60 * 1000);
+    if (!mobileLimit.ok) {
+      const response = apiError(
+        req,
+        429,
+        "RATE_LIMITED",
+        "Too many OTP requests for this number. Try again later.",
+        { retryAfterSeconds: mobileLimit.retryAfterSeconds }
+      );
+      response.headers.set("retry-after", String(mobileLimit.retryAfterSeconds));
+      return response;
     }
 
     const sendAllowed = checkOtpSendAllowed(to);

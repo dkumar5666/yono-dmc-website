@@ -12,13 +12,13 @@ export default function Navbar() {
 
   const navLinks = [
     { name: "Home", path: "/" },
-    { name: "Holidays", path: "/holidays" },
+    { name: "Packages", path: "/holidays" },
     { name: "Destinations", path: "/destinations" },
     { name: "Flights", path: "/flights" },
-    { name: "Hotels", path: "/hotels" },
+    { name: "Stays", path: "/hotels" },
     { name: "Visa Services", path: "/visa" },
     { name: "About", path: "/about" },
-    { name: "Contact", path: "/contact" },
+    { name: "Contact Us", path: "/contact" },
   ];
 
   const isActive = (path: string) => pathname === path;

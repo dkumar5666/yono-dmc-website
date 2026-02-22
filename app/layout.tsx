@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import { Poppins } from "next/font/google";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import LayoutShell from "@/components/LayoutShell";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -29,9 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} font-sans antialiased`}>
-        <Header />
-        <main>{children}</main>
-        <Footer />
+        <LayoutShell>{children}</LayoutShell>
       </body>
     </html>
   );

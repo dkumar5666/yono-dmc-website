@@ -25,10 +25,27 @@ interface AmadeusResult {
   data?: AmadeusOffer[];
 }
 
-const amadeus = new Amadeus({
-  clientId: process.env.AMADEUS_CLIENT_ID ?? "",
-  clientSecret: process.env.AMADEUS_CLIENT_SECRET ?? "",
-});
+let amadeusClient: InstanceType<typeof Amadeus> | null = null;
+
+function getAmadeusClient(): InstanceType<typeof Amadeus> {
+  if (amadeusClient) return amadeusClient;
+
+  const clientId = process.env.AMADEUS_CLIENT_ID?.trim();
+  const clientSecret = process.env.AMADEUS_CLIENT_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Amadeus credentials are missing. Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET."
+    );
+  }
+
+  amadeusClient = new Amadeus({
+    clientId,
+    clientSecret,
+  });
+
+  return amadeusClient;
+}
 
 function toNumber(value: string | undefined, fallback = 0): number {
   if (!value) return fallback;
@@ -39,9 +56,7 @@ function toNumber(value: string | undefined, fallback = 0): number {
 export async function searchFlights(
   input: FlightSearchRequest
 ): Promise<FlightOfferSummary[]> {
-  if (!process.env.AMADEUS_CLIENT_ID || !process.env.AMADEUS_CLIENT_SECRET) {
-    throw new Error("Amadeus credentials are missing");
-  }
+  const amadeus = getAmadeusClient();
 
   const response = (await amadeus.shopping.flightOffersSearch.get({
     originLocationCode: input.from,

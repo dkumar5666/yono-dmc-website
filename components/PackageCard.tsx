@@ -17,7 +17,7 @@ export default function PackageCard({ package: pkg }: Props) {
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
           className="object-cover group-hover:scale-110 transition"
-          unoptimized={pkg.image.startsWith("/api/images/")}
+
         />
         <span className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-sm">
           {pkg.duration}
@@ -53,4 +53,5 @@ export default function PackageCard({ package: pkg }: Props) {
     </Link>
   );
 }
+
 

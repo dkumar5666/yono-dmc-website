@@ -201,6 +201,9 @@ export default function AdminDestinationsPage() {
             <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
               Holiday Builder
             </Link>
+            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">
+              Attractions
+            </Link>
             <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">
               Blog Posts
             </Link>

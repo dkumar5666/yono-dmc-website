@@ -19,7 +19,7 @@ export default function HolidayGallery({ title, images }: HolidayGalleryProps) {
               alt={`${title} image ${index + 1}`}
               fill
               className="object-cover"
-              unoptimized={image.startsWith("/api/images/")}
+
             />
           </div>
         ))}
@@ -27,3 +27,4 @@ export default function HolidayGallery({ title, images }: HolidayGalleryProps) {
     </section>
   );
 }
+

@@ -292,6 +292,9 @@ export default function AdminCatalogPage() {
             <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">
               Blog Posts
             </Link>
+            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">
+              Attractions
+            </Link>
             <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">
               AI Conversations
             </Link>

@@ -31,7 +31,7 @@ export default async function TravelTipsGuidesPage() {
                   alt={item.title}
                   fill
                   className="object-cover"
-                  unoptimized={item.image.startsWith("/api/images/")}
+
                 />
               </div>
               <div className="p-5">
@@ -53,3 +53,4 @@ export default async function TravelTipsGuidesPage() {
     </section>
   );
 }
+

@@ -282,6 +282,7 @@ export default function HolidayBuilderPage() {
           <div className="flex gap-3 text-sm">
             <Link href="/admin/catalog" className="text-slate-200 hover:text-white">Catalog Admin</Link>
             <Link href="/admin/destinations" className="text-slate-200 hover:text-white">Destinations</Link>
+            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">Attractions</Link>
             <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">Blog Posts</Link>
             <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">AI Conversations</Link>
           </div>
@@ -320,17 +321,17 @@ export default function HolidayBuilderPage() {
 
                   <label className="block">
                     <span className="text-sm font-medium">Travel Date</span>
-                    <input type="date" value={payload.travel_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                    <input type="date" lang="en-GB" value={payload.travel_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
                   </label>
 
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block">
                       <span className="text-sm font-medium">Start Date</span>
-                      <input type="date" value={payload.travel_start_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_start_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                      <input type="date" lang="en-GB" value={payload.travel_start_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_start_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
                     </label>
                     <label className="block">
                       <span className="text-sm font-medium">End Date</span>
-                      <input type="date" value={payload.travel_end_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_end_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                      <input type="date" lang="en-GB" value={payload.travel_end_date ?? ""} onChange={(e) => setPayload((prev) => ({ ...prev, travel_end_date: e.target.value || null }))} className="mt-1 w-full border rounded-lg px-3 py-2" />
                     </label>
                   </div>
 

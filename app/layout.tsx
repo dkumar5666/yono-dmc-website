@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s | Yono DMC",
   },
   description:
-    "Yono DMC is a trusted travel agency in India offering customized domestic & international holiday packages including Dubai, Bali, Singapore, Malaysia and more.",
+    "Yono DMC is a trusted travel agency in India offering customized domestic and international holidays including Dubai, Bali, Singapore, Malaysia, and more.",
 };
 
 export default function RootLayout({

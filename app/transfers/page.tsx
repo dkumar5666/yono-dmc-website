@@ -60,8 +60,8 @@ export default function TransfersPage() {
     <main className="min-h-screen bg-slate-50">
       <section className="bg-slate-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-4xl md:text-5xl font-bold">Airport Transfers</h1>
-          <p className="mt-3 text-slate-200">Search private transfer options from airport to hotel.</p>
+          <h1 className="text-4xl md:text-5xl font-bold">Cabs</h1>
+          <p className="mt-3 text-slate-200">Search airport and city cab options for your trip.</p>
         </div>
       </section>
 
@@ -71,7 +71,22 @@ export default function TransfersPage() {
           <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Drop address" className="h-12 rounded-xl border border-slate-300 px-3" required />
           <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="h-12 rounded-xl border border-slate-300 px-3" required />
           <input value={countryCode} onChange={(e) => setCountryCode(e.target.value.toUpperCase())} maxLength={2} placeholder="Country" className="h-12 rounded-xl border border-slate-300 px-3" required />
-          <input type="datetime-local" value={dateTime} onChange={(e) => setDateTime(e.target.value)} className="h-12 rounded-xl border border-slate-300 px-3" required />`n          <input type="number" min={1} max={9} value={passengers} onChange={(e) => setPassengers(Number(e.target.value))} className="h-12 rounded-xl border border-slate-300 px-3" placeholder="Passengers" />
+          <input
+            type="datetime-local"
+            value={dateTime}
+            onChange={(e) => setDateTime(e.target.value)}
+            className="h-12 rounded-xl border border-slate-300 px-3"
+            required
+          />
+          <input
+            type="number"
+            min={1}
+            max={9}
+            value={passengers}
+            onChange={(e) => setPassengers(Number(e.target.value))}
+            className="h-12 rounded-xl border border-slate-300 px-3"
+            placeholder="Passengers"
+          />
           <button type="submit" disabled={busy} className="h-12 rounded-xl bg-[#199ce0] text-white font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-70">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Search
@@ -94,7 +109,7 @@ export default function TransfersPage() {
               <p className="mt-1 text-xs text-slate-500">Source: {offer.source}</p>
               <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#199ce0] px-4 py-2.5 text-white font-semibold">
                 <CarFront className="h-4 w-4" />
-                Reserve Transfer
+                Reserve Cab
               </button>
             </article>
           ))}

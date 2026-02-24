@@ -20,6 +20,14 @@ interface BookingRecord {
 
 type GuestView = "landing" | "lookup";
 
+function formatDateDDMMYYYY(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 export default function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -123,7 +131,7 @@ export default function TripsPage() {
                 <div className="mt-4 grid sm:grid-cols-3 gap-3 text-sm text-slate-700">
                   <p>
                     <span className="text-slate-500">Booked on:</span>{" "}
-                    {new Date(item.createdAt).toLocaleDateString("en-IN")}
+                    {formatDateDDMMYYYY(item.createdAt)}
                   </p>
                   <p>
                     <span className="text-slate-500">Amount:</span> {item.currency}{" "}

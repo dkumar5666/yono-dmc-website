@@ -228,7 +228,7 @@ const helpTopics: HelpTopic[] = [
   },
   {
     id: "things-to-do",
-    title: "Things to do",
+    title: "Attractions",
     icon: Sparkles,
     articles: [
       {

@@ -2,7 +2,7 @@ export const siteConfig = {
   name: "Yono DMC",
   tagline: "Trusted Travel Agency in India",
   description:
-    "Domestic & International Holiday Packages including Dubai, Bali, Singapore, Malaysia and more.",
+    "Domestic and international holidays including Dubai, Bali, Singapore, Malaysia, and more.",
 
   contact: {
     phone: "+919958839319",
@@ -10,7 +10,7 @@ export const siteConfig = {
     email: "info@yonodmc.com",
     address:
       "Unit No. 259, 2nd Floor, Tower No. B1, SPAZE ITECH PARK, Badshahpur Sohna Rd, Sector 49, Gurugram, Haryana 122018",
-    hours: "Mon–Sat: 9:00 AM – 5:00 PM | Sunday Closed",
+    hours: "Mon-Sat: 9:00 AM - 5:00 PM | Sunday Closed",
   },
 
   socials: {

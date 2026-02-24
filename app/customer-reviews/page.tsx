@@ -7,7 +7,7 @@ import { testimonials } from "@/data/mockData";
 export const metadata: Metadata = {
   title: "Customer Reviews",
   description:
-    "Read verified customer experiences and travel feedback for Yono DMC holiday packages.",
+    "Read verified customer experiences and travel feedback for Yono DMC holidays.",
 };
 
 export default function CustomerReviewsPage() {
@@ -75,7 +75,7 @@ export default function CustomerReviewsPage() {
                     alt={review.name}
                     fill
                     className="object-cover"
-                    unoptimized={review.image.startsWith("/api/images/")}
+
                     sizes="56px"
                   />
                 </div>
@@ -136,3 +136,4 @@ export default function CustomerReviewsPage() {
     </main>
   );
 }
+

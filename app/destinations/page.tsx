@@ -14,6 +14,13 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeDestinationCountry(value: string): string {
+  const raw = value.trim().toLowerCase();
+  if (raw === "uae") return "United Arab Emirates";
+  if (raw === "bali") return "Indonesia";
+  return value;
+}
+
 export default function DestinationsPage() {
   const [destinations, setDestinations] = useState<Destination[]>(seedDestinations);
 
@@ -56,7 +63,9 @@ export default function DestinationsPage() {
       <section className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {destinations.map((destination) => {
-            const country = destination.country ?? destination.name;
+            const country = normalizeDestinationCountry(
+              destination.country ?? destination.name
+            );
             const slug = toSlug(country);
             const packageCount = packageCountByCountry[slug] ?? destination.packages;
 

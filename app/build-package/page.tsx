@@ -65,8 +65,8 @@ export default function BuildPackagePage() {
           <input required type="email" placeholder="Email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
           <input required placeholder="Phone" value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
           <input required placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
-          <input type="date" value={form.travel_start_date} onChange={(e) => setForm({ ...form, travel_start_date: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
-          <input type="date" value={form.travel_end_date} onChange={(e) => setForm({ ...form, travel_end_date: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
+          <input type="date" lang="en-GB" value={form.travel_start_date} onChange={(e) => setForm({ ...form, travel_start_date: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
+          <input type="date" lang="en-GB" value={form.travel_end_date} onChange={(e) => setForm({ ...form, travel_end_date: e.target.value })} className="h-12 rounded-xl border border-slate-300 px-3" />
           <input type="number" min={1} value={form.adults} onChange={(e) => setForm({ ...form, adults: Number(e.target.value) })} className="h-12 rounded-xl border border-slate-300 px-3" placeholder="Adults" />
           <input type="number" min={0} value={form.children} onChange={(e) => setForm({ ...form, children: Number(e.target.value) })} className="h-12 rounded-xl border border-slate-300 px-3" placeholder="Children" />
           <input type="number" min={0} value={form.budget_min} onChange={(e) => setForm({ ...form, budget_min: Number(e.target.value) })} className="h-12 rounded-xl border border-slate-300 px-3" placeholder="Min Budget" />
@@ -75,7 +75,7 @@ export default function BuildPackagePage() {
           <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_flights} onChange={(e) => setForm({ ...form, needs_flights: e.target.checked })} /> Flights</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_stays} onChange={(e) => setForm({ ...form, needs_stays: e.target.checked })} /> Stays</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_activities} onChange={(e) => setForm({ ...form, needs_activities: e.target.checked })} /> Things To Do</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_activities} onChange={(e) => setForm({ ...form, needs_activities: e.target.checked })} /> Attractions</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_transfers} onChange={(e) => setForm({ ...form, needs_transfers: e.target.checked })} /> Transfers</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.needs_visa} onChange={(e) => setForm({ ...form, needs_visa: e.target.checked })} /> Visa</label>
           </div>

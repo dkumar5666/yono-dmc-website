@@ -168,7 +168,7 @@ export default function AdminCustomPackageRequestsPage() {
               <div className="mt-3 text-sm text-slate-700 flex flex-wrap gap-3">
                 {item.needs_flights ? <span>Flights</span> : null}
                 {item.needs_stays ? <span>Stays</span> : null}
-                {item.needs_activities ? <span>Things To Do</span> : null}
+                {item.needs_activities ? <span>Attractions</span> : null}
                 {item.needs_transfers ? <span>Transfers</span> : null}
                 {item.needs_visa ? <span>Visa</span> : null}
               </div>

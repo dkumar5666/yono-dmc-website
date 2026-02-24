@@ -85,6 +85,9 @@ export default function Footer() {
                 <Link href="/">Home</Link>
               </li>
               <li>
+                <Link href="/offers">Offers</Link>
+              </li>
+              <li>
                 <Link href="/holidays">Packages</Link>
               </li>
               <li>
@@ -92,6 +95,27 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/hotels">Stays</Link>
+              </li>
+              <li>
+                <Link href="/things-to-do">Attractions</Link>
+              </li>
+              <li>
+                <Link href="/cabs">Cabs</Link>
+              </li>
+              <li>
+                <Link href="/trains">Trains</Link>
+              </li>
+              <li>
+                <Link href="/bus">Bus</Link>
+              </li>
+              <li>
+                <Link href="/forex">Forex</Link>
+              </li>
+              <li>
+                <Link href="/cruise">Cruise</Link>
+              </li>
+              <li>
+                <Link href="/insurance">Insurance</Link>
               </li>
               <li>
                 <Link href="/visa">Visa Services</Link>

@@ -42,7 +42,7 @@ export default async function DestinationPackagesPage({ params }: Props) {
                     alt={pkg.title}
                     fill
                     className="object-cover"
-                    unoptimized={pkg.image.startsWith("/api/images/")}
+
                   />
                 </div>
                 <div className="p-6 flex-1">
@@ -62,3 +62,4 @@ export default async function DestinationPackagesPage({ params }: Props) {
     </section>
   );
 }
+

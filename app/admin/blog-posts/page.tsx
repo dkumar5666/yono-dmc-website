@@ -178,6 +178,9 @@ export default function AdminBlogPostsPage() {
             <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
               Holiday Builder
             </Link>
+            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">
+              Attractions
+            </Link>
             <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">
               AI Conversations
             </Link>
@@ -230,6 +233,7 @@ export default function AdminBlogPostsPage() {
               <input
                 required
                 type="date"
+                lang="en-GB"
                 value={form.date}
                 onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
                 className="mt-1 w-full border rounded-lg px-3 py-2"

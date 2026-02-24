@@ -14,13 +14,18 @@ type PexelsResponse = {
   }>;
 };
 
+const resolvedImageUrlCache = new Map<string, string>();
+
 async function fetchPexelsImage(query: string): Promise<string | null> {
+  const cached = resolvedImageUrlCache.get(query);
+  if (cached) return cached;
+
   const apiKey = process.env.PEXELS_API_KEY;
   if (!apiKey) return null;
 
   const url = `${PEXELS_SEARCH_URL}?query=${encodeURIComponent(
     query
-  )}&orientation=landscape&per_page=1`;
+  )}&orientation=landscape&size=large&per_page=3`;
 
   const response = await fetch(url, {
     headers: { Authorization: apiKey },
@@ -31,7 +36,12 @@ async function fetchPexelsImage(query: string): Promise<string | null> {
 
   const data = (await response.json()) as PexelsResponse;
   const photo = data.photos?.[0]?.src;
-  return photo?.landscape ?? photo?.large ?? photo?.large2x ?? photo?.original ?? null;
+  // Prefer balanced quality to keep pages fast and still crisp.
+  const resolved = photo?.large2x ?? photo?.large ?? photo?.landscape ?? photo?.original ?? null;
+  if (resolved) {
+    resolvedImageUrlCache.set(query, resolved);
+  }
+  return resolved;
 }
 
 async function fetchImageBinary(url: string): Promise<Response | null> {
@@ -48,7 +58,7 @@ async function fetchImageBinary(url: string): Promise<Response | null> {
     status: 200,
     headers: {
       "content-type": contentType,
-      "cache-control": "public, max-age=43200, s-maxage=43200, stale-while-revalidate=86400",
+      "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
     },
   });
 }

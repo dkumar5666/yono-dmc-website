@@ -19,7 +19,7 @@ export default function HolidayHero({ holiday }: HolidayHeroProps) {
         fill
         className="object-cover"
         priority
-        unoptimized={holiday.image.startsWith("/api/images/")}
+
       />
       <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 to-slate-800/60" />
 
@@ -32,3 +32,4 @@ export default function HolidayHero({ holiday }: HolidayHeroProps) {
     </section>
   );
 }
+

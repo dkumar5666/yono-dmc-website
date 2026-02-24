@@ -235,7 +235,7 @@ export default async function TravelTipDetailPage(
               alt={post.title}
               fill
               className="object-cover"
-              unoptimized={post.image.startsWith("/api/images/")}
+
             />
           </div>
           <p className="text-sm text-blue-700 font-semibold mb-2">{post.category}</p>
@@ -315,3 +315,4 @@ export default async function TravelTipDetailPage(
     </section>
   );
 }
+

@@ -46,6 +46,18 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ offers });
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (message.includes("Amadeus credentials are missing")) {
+      return NextResponse.json(
+        {
+          error: "Flight provider is not configured",
+          code: "FLIGHT_PROVIDER_NOT_CONFIGURED",
+          missingEnv: ["AMADEUS_CLIENT_ID", "AMADEUS_CLIENT_SECRET"],
+        },
+        { status: 503 }
+      );
+    }
+
     console.error("FLIGHT API ERROR:", error);
     return NextResponse.json({ error: "Flight API failed" }, { status: 500 });
   }

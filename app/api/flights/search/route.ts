@@ -28,6 +28,18 @@ export async function POST(req: Request) {
     const offers = await searchFlights(payload);
     return NextResponse.json({ offers });
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (message.includes("Amadeus credentials are missing")) {
+      return NextResponse.json(
+        {
+          error: "Flight provider is not configured",
+          code: "FLIGHT_PROVIDER_NOT_CONFIGURED",
+          missingEnv: ["AMADEUS_CLIENT_ID", "AMADEUS_CLIENT_SECRET"],
+        },
+        { status: 503 }
+      );
+    }
+
     console.error("FLIGHT SEARCH ERROR:", error);
     return NextResponse.json({ error: "Failed to fetch flights" }, { status: 500 });
   }

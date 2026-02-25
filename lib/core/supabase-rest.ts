@@ -105,6 +105,25 @@ export class SupabaseRestClient {
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   }
 
+  async deleteSingle<T>(table: string, query: URLSearchParams): Promise<T | null> {
+    const url = `${this.config.url}/rest/v1/${table}?${query.toString()}`;
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        ...this.headers(),
+        Prefer: "return=representation",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase delete failed (${table}): ${response.status} ${await response.text()}`);
+    }
+
+    const rows = (await response.json()) as T[];
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  }
+
   async uploadFile(
     bucket: string,
     objectPath: string,

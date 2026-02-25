@@ -11,9 +11,8 @@ export async function GET(req: Request) {
   if (rateLimitResponse) return rateLimitResponse;
 
   try {
-    return NextResponse.json({ data: listPublishedBlogPosts() });
+    return NextResponse.json({ data: await listPublishedBlogPosts() });
   } catch {
     return NextResponse.json({ success: false, error: "Failed to load blog posts" }, { status: 500 });
   }
 }
-

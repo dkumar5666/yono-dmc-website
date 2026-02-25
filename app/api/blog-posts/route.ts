@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   if (rateLimitResponse) return rateLimitResponse;
 
   try {
-    return NextResponse.json({ data: listPublishedBlogPosts() });
+    return NextResponse.json({ data: await listPublishedBlogPosts() });
   } catch (error) {
     console.error("PUBLIC BLOG POSTS ERROR:", error);
     return NextResponse.json({ error: "Failed to load blog posts" }, { status: 500 });

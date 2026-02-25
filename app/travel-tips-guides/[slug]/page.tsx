@@ -147,7 +147,7 @@ export async function generateMetadata(
   { params }: { params: Promise<Params> | Params }
 ): Promise<Metadata> {
   const resolved = "then" in params ? await params : params;
-  const post = getPublishedBlogPostBySlug(resolved.slug);
+  const post = await getPublishedBlogPostBySlug(resolved.slug);
   if (!post) return { title: "Post Not Found" };
   return {
     title: `${post.title} | Travel Tips & Guides`,
@@ -156,7 +156,7 @@ export async function generateMetadata(
 }
 
 export async function generateStaticParams() {
-  const posts = listPublishedBlogPosts();
+  const posts = await listPublishedBlogPosts();
   return posts.map((post) => ({ slug: post.slug }));
 }
 
@@ -164,7 +164,7 @@ export default async function TravelTipDetailPage(
   { params }: { params: Promise<Params> | Params }
 ) {
   const resolved = "then" in params ? await params : params;
-  const post = getPublishedBlogPostBySlug(resolved.slug);
+  const post = await getPublishedBlogPostBySlug(resolved.slug);
   if (!post) notFound();
 
   const profile =

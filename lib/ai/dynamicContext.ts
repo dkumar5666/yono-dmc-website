@@ -87,9 +87,9 @@ async function buildCatalogContext(query: string): Promise<string> {
   }
 }
 
-function buildBlogContext(query: string): string {
+async function buildBlogContext(query: string): Promise<string> {
   try {
-    const posts = listPublishedBlogPosts();
+    const posts = await listPublishedBlogPosts();
     const tokens = tokenize(query);
     const topPosts = posts
       .map((post) => {
@@ -163,12 +163,11 @@ export async function buildDynamicAIContext(
   req: Request,
   query: string
 ): Promise<string> {
-  const [catalogContext, customerContext] = await Promise.all([
+  const [catalogContext, blogContext, customerContext] = await Promise.all([
     buildCatalogContext(query),
+    buildBlogContext(query),
     buildCustomerTripContext(req),
   ]);
-  const blogContext = buildBlogContext(query);
 
   return [catalogContext, blogContext, customerContext].join("\n\n");
 }
-

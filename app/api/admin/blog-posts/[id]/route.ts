@@ -18,7 +18,7 @@ export async function PUT(
   try {
     const resolved = "then" in params ? await params : params;
     const body = (await req.json()) as BlogPostInput;
-    const updated = updateBlogPost(resolved.id, body);
+    const updated = await updateBlogPost(resolved.id, body);
     return NextResponse.json({ data: updated });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to update blog post";
@@ -41,7 +41,7 @@ export async function DELETE(
 
   try {
     const resolved = "then" in params ? await params : params;
-    deleteBlogPost(resolved.id);
+    await deleteBlogPost(resolved.id);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to delete blog post";

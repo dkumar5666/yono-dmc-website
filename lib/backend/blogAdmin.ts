@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
 import { getDb } from "@/lib/backend/sqlite";
 import { travelTips } from "@/data/travelTips";
+import {
+  SupabaseNotConfiguredError,
+  SupabaseRestClient,
+  getSupabaseConfig,
+} from "@/lib/core/supabase-rest";
 
 const allowedStatuses = ["draft", "published", "archived"] as const;
 
@@ -18,7 +23,7 @@ export interface BlogPostInput {
   status: BlogStatus;
 }
 
-interface SqlBlogRow {
+interface StoredBlogRow {
   id: string;
   title: string;
   slug: string;
@@ -32,6 +37,24 @@ interface SqlBlogRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface BlogPostRecord {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  date: string;
+  image: string;
+  category: string;
+  readTime: string;
+  status: BlogStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+let supabaseSeedCompleted = false;
+let supabaseSeedPromise: Promise<void> | null = null;
 
 function sanitizeText(value: unknown, maxLen = 255): string {
   return String(value ?? "")
@@ -56,41 +79,7 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function ensureSeedData() {
-  const db = getDb();
-  const total = db.prepare("SELECT COUNT(*) as count FROM blog_posts").get() as { count: number };
-  if (total.count > 0) return;
-
-  const insert = db.prepare(
-    `INSERT INTO blog_posts (
-      id, slug, title, excerpt, content, publish_date, image_url, category, read_time, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-
-  db.exec("BEGIN");
-  try {
-    for (const post of travelTips) {
-      insert.run(
-        crypto.randomUUID(),
-        sanitizeText(post.slug, 180),
-        sanitizeText(post.title, 180),
-        sanitizeLongText(post.excerpt, 1200),
-        sanitizeLongText(post.content, 30000),
-        sanitizeText(post.date, 10),
-        sanitizeText(post.image, 500),
-        sanitizeText(post.category, 80),
-        sanitizeText(post.readTime, 40) || "6 min read",
-        "published"
-      );
-    }
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-}
-
-function mapRow(row: SqlBlogRow) {
+function mapRow(row: StoredBlogRow): BlogPostRecord {
   return {
     id: row.id,
     slug: row.slug,
@@ -138,8 +127,145 @@ function validateInput(input: BlogPostInput): string | null {
   return null;
 }
 
-export function listBlogPosts() {
-  ensureSeedData();
+function blogSelectColumns(): string {
+  return [
+    "id",
+    "slug",
+    "title",
+    "excerpt",
+    "content",
+    "publish_date",
+    "image_url",
+    "category",
+    "read_time",
+    "status",
+    "created_at",
+    "updated_at",
+  ].join(",");
+}
+
+function recentOrderQuery(): URLSearchParams {
+  const query = new URLSearchParams();
+  query.set("select", blogSelectColumns());
+  query.set("order", "publish_date.desc,updated_at.desc");
+  return query;
+}
+
+function isSupabaseConfigured(): boolean {
+  return Boolean(getSupabaseConfig());
+}
+
+function isDuplicateError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("duplicate key value violates unique constraint") ||
+    message.includes("\"23505\"") ||
+    message.includes("23505")
+  );
+}
+
+function isMissingBlogTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    (message.includes("blog_posts") && message.includes("does not exist")) ||
+    message.includes("Could not find the table 'public.blog_posts'") ||
+    message.includes("PGRST205")
+  );
+}
+
+function toSupabaseSeedRow(post: (typeof travelTips)[number]): Record<string, unknown> {
+  return {
+    id: crypto.randomUUID(),
+    slug: sanitizeText(post.slug, 180),
+    title: sanitizeText(post.title, 180),
+    excerpt: sanitizeLongText(post.excerpt, 1200),
+    content: sanitizeLongText(post.content, 30000),
+    publish_date: sanitizeText(post.date, 10),
+    image_url: sanitizeText(post.image, 500),
+    category: sanitizeText(post.category, 80),
+    read_time: sanitizeText(post.readTime, 40) || "6 min read",
+    status: "published",
+  };
+}
+
+async function ensureSupabaseSeedData(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  if (supabaseSeedCompleted) return;
+  if (supabaseSeedPromise) return supabaseSeedPromise;
+
+  supabaseSeedPromise = (async () => {
+    const client = new SupabaseRestClient();
+    try {
+      const probe = new URLSearchParams();
+      probe.set("select", "id");
+      const existing = await client.selectSingle<{ id: string }>("blog_posts", probe);
+      if (existing) {
+        supabaseSeedCompleted = true;
+        return;
+      }
+    } catch (error) {
+      if (isMissingBlogTableError(error)) {
+        throw new Error(
+          "Supabase blog_posts table is missing. Run db/supabase/migrations/003_blog_posts.sql."
+        );
+      }
+      throw error;
+    }
+
+    for (const post of travelTips) {
+      try {
+        await client.insertSingle<StoredBlogRow>("blog_posts", toSupabaseSeedRow(post));
+      } catch (error) {
+        if (isDuplicateError(error)) continue;
+        throw error;
+      }
+    }
+
+    supabaseSeedCompleted = true;
+  })().finally(() => {
+    supabaseSeedPromise = null;
+  });
+
+  return supabaseSeedPromise;
+}
+
+// SQLite fallback (local/dev or when Supabase is not configured)
+function ensureSqliteSeedData() {
+  const db = getDb();
+  const total = db.prepare("SELECT COUNT(*) as count FROM blog_posts").get() as { count: number };
+  if (total.count > 0) return;
+
+  const insert = db.prepare(
+    `INSERT INTO blog_posts (
+      id, slug, title, excerpt, content, publish_date, image_url, category, read_time, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  db.exec("BEGIN");
+  try {
+    for (const post of travelTips) {
+      insert.run(
+        crypto.randomUUID(),
+        sanitizeText(post.slug, 180),
+        sanitizeText(post.title, 180),
+        sanitizeLongText(post.excerpt, 1200),
+        sanitizeLongText(post.content, 30000),
+        sanitizeText(post.date, 10),
+        sanitizeText(post.image, 500),
+        sanitizeText(post.category, 80),
+        sanitizeText(post.readTime, 40) || "6 min read",
+        "published"
+      );
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function listBlogPostsSqlite(): BlogPostRecord[] {
+  ensureSqliteSeedData();
   const db = getDb();
   const rows = db
     .prepare(
@@ -147,12 +273,12 @@ export function listBlogPosts() {
        FROM blog_posts
        ORDER BY publish_date DESC, updated_at DESC`
     )
-    .all() as SqlBlogRow[];
+    .all() as StoredBlogRow[];
   return rows.map(mapRow);
 }
 
-export function listPublishedBlogPosts() {
-  ensureSeedData();
+function listPublishedBlogPostsSqlite(): BlogPostRecord[] {
+  ensureSqliteSeedData();
   const db = getDb();
   const rows = db
     .prepare(
@@ -161,12 +287,12 @@ export function listPublishedBlogPosts() {
        WHERE status = 'published'
        ORDER BY publish_date DESC, updated_at DESC`
     )
-    .all() as SqlBlogRow[];
+    .all() as StoredBlogRow[];
   return rows.map(mapRow);
 }
 
-export function getPublishedBlogPostBySlug(slug: string) {
-  ensureSeedData();
+function getPublishedBlogPostBySlugSqlite(slug: string): BlogPostRecord | null {
+  ensureSqliteSeedData();
   const db = getDb();
   const row = db
     .prepare(
@@ -174,12 +300,12 @@ export function getPublishedBlogPostBySlug(slug: string) {
        FROM blog_posts
        WHERE slug = ? AND status = 'published'`
     )
-    .get(slug) as SqlBlogRow | undefined;
+    .get(slug) as StoredBlogRow | undefined;
   return row ? mapRow(row) : null;
 }
 
-export function createBlogPost(input: BlogPostInput) {
-  ensureSeedData();
+function createBlogPostSqlite(input: BlogPostInput): BlogPostRecord {
+  ensureSqliteSeedData();
   const error = validateInput(input);
   if (error) throw new Error(error);
   const normalized = normalizeInput(input);
@@ -208,18 +334,20 @@ export function createBlogPost(input: BlogPostInput) {
       `SELECT id, slug, title, excerpt, content, publish_date, image_url, category, read_time, status, created_at, updated_at
        FROM blog_posts WHERE id = ?`
     )
-    .get(id) as SqlBlogRow;
+    .get(id) as StoredBlogRow;
   return mapRow(created);
 }
 
-export function updateBlogPost(id: string, input: BlogPostInput) {
-  ensureSeedData();
+function updateBlogPostSqlite(id: string, input: BlogPostInput): BlogPostRecord {
+  ensureSqliteSeedData();
   const error = validateInput(input);
   if (error) throw new Error(error);
   const normalized = normalizeInput(input);
   const db = getDb();
 
-  const existing = db.prepare("SELECT id FROM blog_posts WHERE id = ?").get(id) as { id: string } | undefined;
+  const existing = db.prepare("SELECT id FROM blog_posts WHERE id = ?").get(id) as
+    | { id: string }
+    | undefined;
   if (!existing) throw new Error("Blog post not found");
 
   db.prepare(
@@ -244,13 +372,154 @@ export function updateBlogPost(id: string, input: BlogPostInput) {
       `SELECT id, slug, title, excerpt, content, publish_date, image_url, category, read_time, status, created_at, updated_at
        FROM blog_posts WHERE id = ?`
     )
-    .get(id) as SqlBlogRow;
+    .get(id) as StoredBlogRow;
   return mapRow(updated);
 }
 
-export function deleteBlogPost(id: string) {
-  ensureSeedData();
+function deleteBlogPostSqlite(id: string): void {
+  ensureSqliteSeedData();
   const db = getDb();
   const result = db.prepare("DELETE FROM blog_posts WHERE id = ?").run(id);
   if (!result.changes) throw new Error("Blog post not found");
+}
+
+function normalizeSupabaseError(error: unknown): never {
+  if (error instanceof SupabaseNotConfiguredError) {
+    throw error;
+  }
+  if (isDuplicateError(error)) {
+    throw new Error("slug already exists");
+  }
+  throw error instanceof Error ? error : new Error(String(error));
+}
+
+export async function listBlogPosts(): Promise<BlogPostRecord[]> {
+  if (!isSupabaseConfigured()) {
+    return listBlogPostsSqlite();
+  }
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const rows = await client.selectMany<StoredBlogRow>("blog_posts", recentOrderQuery());
+    return rows.map(mapRow);
+  } catch (error) {
+    normalizeSupabaseError(error);
+  }
+}
+
+export async function listPublishedBlogPosts(): Promise<BlogPostRecord[]> {
+  if (!isSupabaseConfigured()) {
+    return listPublishedBlogPostsSqlite();
+  }
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const query = recentOrderQuery();
+    query.set("status", "eq.published");
+    const rows = await client.selectMany<StoredBlogRow>("blog_posts", query);
+    return rows.map(mapRow);
+  } catch (error) {
+    normalizeSupabaseError(error);
+  }
+}
+
+export async function getPublishedBlogPostBySlug(slug: string): Promise<BlogPostRecord | null> {
+  if (!isSupabaseConfigured()) {
+    return getPublishedBlogPostBySlugSqlite(slug);
+  }
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const query = new URLSearchParams();
+    query.set("select", blogSelectColumns());
+    query.set("slug", `eq.${sanitizeText(slug, 180)}`);
+    query.set("status", "eq.published");
+    const row = await client.selectSingle<StoredBlogRow>("blog_posts", query);
+    return row ? mapRow(row) : null;
+  } catch (error) {
+    normalizeSupabaseError(error);
+  }
+}
+
+export async function createBlogPost(input: BlogPostInput): Promise<BlogPostRecord> {
+  if (!isSupabaseConfigured()) {
+    return createBlogPostSqlite(input);
+  }
+
+  const error = validateInput(input);
+  if (error) throw new Error(error);
+  const normalized = normalizeInput(input);
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const row = await client.insertSingle<StoredBlogRow>("blog_posts", {
+      id: crypto.randomUUID(),
+      slug: normalized.slug,
+      title: normalized.title,
+      excerpt: normalized.excerpt,
+      content: normalized.content,
+      publish_date: normalized.publish_date,
+      image_url: normalized.image_url,
+      category: normalized.category,
+      read_time: normalized.read_time,
+      status: normalized.status,
+    });
+    return mapRow(row);
+  } catch (e) {
+    normalizeSupabaseError(e);
+  }
+}
+
+export async function updateBlogPost(id: string, input: BlogPostInput): Promise<BlogPostRecord> {
+  if (!isSupabaseConfigured()) {
+    return updateBlogPostSqlite(id, input);
+  }
+
+  const error = validateInput(input);
+  if (error) throw new Error(error);
+  const normalized = normalizeInput(input);
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const query = new URLSearchParams();
+    query.set("id", `eq.${id}`);
+    const row = await client.updateSingle<StoredBlogRow>("blog_posts", query, {
+      slug: normalized.slug,
+      title: normalized.title,
+      excerpt: normalized.excerpt,
+      content: normalized.content,
+      publish_date: normalized.publish_date,
+      image_url: normalized.image_url,
+      category: normalized.category,
+      read_time: normalized.read_time,
+      status: normalized.status,
+    });
+    if (!row) throw new Error("Blog post not found");
+    return mapRow(row);
+  } catch (e) {
+    normalizeSupabaseError(e);
+  }
+}
+
+export async function deleteBlogPost(id: string): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    deleteBlogPostSqlite(id);
+    return;
+  }
+
+  try {
+    await ensureSupabaseSeedData();
+    const client = new SupabaseRestClient();
+    const query = new URLSearchParams();
+    query.set("id", `eq.${id}`);
+    const row = await client.deleteSingle<{ id: string }>("blog_posts", query);
+    if (!row) throw new Error("Blog post not found");
+  } catch (e) {
+    normalizeSupabaseError(e);
+  }
 }

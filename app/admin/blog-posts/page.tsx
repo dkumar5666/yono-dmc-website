@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 
 type BlogStatus = "draft" | "published" | "archived";
 
@@ -161,34 +160,7 @@ export default function AdminBlogPostsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <section className="bg-slate-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Blog Management</h1>
-            <p className="text-slate-300">Create and publish travel blog posts</p>
-          </div>
-          <div className="flex gap-3 text-sm">
-            <Link href="/admin/catalog" className="text-slate-200 hover:text-white">
-              Catalog Admin
-            </Link>
-            <Link href="/admin/destinations" className="text-slate-200 hover:text-white">
-              Destinations
-            </Link>
-            <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
-              Holiday Builder
-            </Link>
-            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">
-              Attractions
-            </Link>
-            <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">
-              AI Conversations
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <section className="max-w-7xl mx-auto space-y-6">
         <form onSubmit={submitForm} className="bg-white rounded-xl shadow p-6 space-y-4">
           <h2 className="text-xl font-semibold">
             {editingId ? "Edit Blog Post" : "Add Blog Post"}
@@ -360,6 +332,5 @@ export default function AdminBlogPostsPage() {
           </table>
         </div>
       </section>
-    </div>
   );
 }

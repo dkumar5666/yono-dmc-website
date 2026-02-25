@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 type RequestItem = {
   id: string;
@@ -97,22 +96,13 @@ export default function AdminCustomPackageRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <section className="bg-slate-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Custom Package Requests</h1>
-            <p className="text-slate-300">
-              Customer build-package leads for operations team
-            </p>
-          </div>
-          <Link href="/admin/catalog" className="text-slate-200 hover:text-white">
-            Back to Catalog
-          </Link>
+      <section className="max-w-7xl mx-auto">
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Custom Package Requests</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Customer build-package leads for operations team
+          </p>
         </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-4 flex items-center gap-3">
           <label className="text-sm font-medium">Status</label>
           <select
@@ -214,6 +204,5 @@ export default function AdminCustomPackageRequestsPage() {
           ) : null}
         </div>
       </section>
-    </div>
   );
 }

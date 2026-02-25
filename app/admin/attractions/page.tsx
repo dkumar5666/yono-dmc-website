@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import type { TicketedAttraction } from "@/data/ticketedAttractions";
 
 interface AuthUser {
@@ -322,33 +321,7 @@ export default function AdminAttractionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <section className="bg-slate-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Attractions Admin</h1>
-            <p className="text-slate-300">
-              Upload and manage ticketed attractions via CSV
-            </p>
-          </div>
-          <div className="flex gap-3 text-sm">
-            <Link href="/admin/catalog" className="text-slate-200 hover:text-white">
-              Catalog Admin
-            </Link>
-            <Link href="/admin/destinations" className="text-slate-200 hover:text-white">
-              Destinations
-            </Link>
-            <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
-              Holiday Builder
-            </Link>
-            <Link href="/" className="text-slate-200 hover:text-white">
-              Back to site
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <section className="max-w-7xl mx-auto space-y-6">
         <div className="bg-white rounded-xl shadow p-6 space-y-4">
           <div className="grid md:grid-cols-3 gap-3">
             <label className="block">
@@ -591,6 +564,5 @@ export default function AdminAttractionsPage() {
           </div>
         </div>
       </section>
-    </div>
   );
 }

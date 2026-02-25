@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 interface ConversationItem {
   id: string;
@@ -135,34 +134,7 @@ export default function AdminAIConversationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <section className="bg-slate-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">AI Conversations</h1>
-            <p className="text-slate-300">Lead captures and chat transcripts</p>
-          </div>
-          <div className="flex gap-3 text-sm">
-            <Link href="/admin/catalog" className="text-slate-200 hover:text-white">
-              Catalog Admin
-            </Link>
-            <Link href="/admin/destinations" className="text-slate-200 hover:text-white">
-              Destinations
-            </Link>
-            <Link href="/admin/holiday-builder" className="text-slate-200 hover:text-white">
-              Holiday Builder
-            </Link>
-            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">
-              Attractions
-            </Link>
-            <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">
-              Blog Posts
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-8 grid lg:grid-cols-2 gap-6">
+      <section className="max-w-7xl mx-auto grid gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-xl shadow p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h2 className="text-xl font-semibold">Conversation List</h2>
@@ -317,6 +289,5 @@ export default function AdminAIConversationsPage() {
           )}
         </div>
       </section>
-    </div>
   );
 }

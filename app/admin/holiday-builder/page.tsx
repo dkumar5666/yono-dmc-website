@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 
 type PackageStatus = "draft" | "published" | "archived";
 
@@ -272,24 +271,7 @@ export default function HolidayBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <section className="bg-slate-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Holiday Customize Builder</h1>
-            <p className="text-slate-300">Detailed package builder with publish workflow</p>
-          </div>
-          <div className="flex gap-3 text-sm">
-            <Link href="/admin/catalog" className="text-slate-200 hover:text-white">Catalog Admin</Link>
-            <Link href="/admin/destinations" className="text-slate-200 hover:text-white">Destinations</Link>
-            <Link href="/admin/attractions" className="text-slate-200 hover:text-white">Attractions</Link>
-            <Link href="/admin/blog-posts" className="text-slate-200 hover:text-white">Blog Posts</Link>
-            <Link href="/admin/ai-conversations" className="text-slate-200 hover:text-white">AI Conversations</Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-6 py-8 grid lg:grid-cols-3 gap-6">
+      <section className="max-w-7xl mx-auto grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <form onSubmit={onSubmit} className="bg-white rounded-xl shadow p-6 space-y-6">
             <div className="flex flex-wrap gap-2">
@@ -476,6 +458,5 @@ export default function HolidayBuilderPage() {
           </div>
         </aside>
       </section>
-    </div>
   );
 }

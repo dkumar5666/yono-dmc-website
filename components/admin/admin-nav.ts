@@ -1,12 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
+  AlertTriangle,
   Bot,
   Building2,
+  ClipboardList,
+  CreditCard,
+  FileText,
   Globe2,
   LayoutDashboard,
+  LifeBuoy,
   MapPinned,
   Newspaper,
   PackagePlus,
+  RotateCcw,
 } from "lucide-react";
 
 export interface AdminNavItem {
@@ -22,6 +29,48 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "Control Center",
     shortLabel: "Control",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/admin/bookings",
+    label: "Bookings",
+    shortLabel: "Bookings",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/payments",
+    label: "Payments",
+    shortLabel: "Payments",
+    icon: CreditCard,
+  },
+  {
+    href: "/admin/refunds",
+    label: "Refunds",
+    shortLabel: "Refunds",
+    icon: RotateCcw,
+  },
+  {
+    href: "/admin/documents",
+    label: "Documents",
+    shortLabel: "Documents",
+    icon: FileText,
+  },
+  {
+    href: "/admin/automation/failures",
+    label: "Automation Failures",
+    shortLabel: "Automation",
+    icon: AlertTriangle,
+  },
+  {
+    href: "/admin/suppliers/logs",
+    label: "Supplier Logs",
+    shortLabel: "Supplier Logs",
+    icon: Activity,
+  },
+  {
+    href: "/admin/support-requests",
+    label: "Support Requests",
+    shortLabel: "Support",
+    icon: LifeBuoy,
   },
   { href: "/admin/catalog", label: "Catalog", shortLabel: "Catalog", icon: LayoutDashboard },
   {

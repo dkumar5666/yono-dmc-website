@@ -40,7 +40,7 @@ export interface FlightOfferSummary {
   raw: unknown;
 }
 
-export type BookingType = "flight";
+export type BookingType = "flight" | "hotel";
 export type BookingStatus =
   | "draft"
   | "pending_payment"
@@ -94,6 +94,8 @@ export interface BookingRecord {
   paymentIntentId?: string;
   providerPaymentId?: string;
   amadeusOrderId?: string;
+  hotelConfirmationNumber?: string;
+  hotelSupplierBookingId?: string;
   pnr?: string;
   ticketNumbers?: string[];
   issuedAt?: string;

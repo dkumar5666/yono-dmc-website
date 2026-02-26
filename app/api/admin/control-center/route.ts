@@ -61,6 +61,7 @@ interface ControlCenterResponse {
   missingDocuments: number;
   openSupportRequests: number;
   failedAutomations24h: number;
+  retryingAutomations: number;
   recentBookings: ControlCenterRecentBooking[];
   alerts: ControlCenterAlert[];
   dayWindow?: {
@@ -78,6 +79,7 @@ const EMPTY_RESPONSE: ControlCenterResponse = {
   missingDocuments: 0,
   openSupportRequests: 0,
   failedAutomations24h: 0,
+  retryingAutomations: 0,
   recentBookings: [],
   alerts: [],
 };
@@ -300,6 +302,31 @@ async function getFailedAutomations24h(db: SupabaseRestClient): Promise<number> 
   return 0;
 }
 
+async function getRetryingAutomations(db: SupabaseRestClient): Promise<number> {
+  const candidates: Array<{ table: string; query: URLSearchParams }> = [
+    {
+      table: "automation_failures",
+      query: new URLSearchParams({
+        select: "id",
+        status: "eq.retrying",
+      }),
+    },
+    {
+      table: "event_failures",
+      query: new URLSearchParams({
+        select: "id",
+        status: "eq.retrying",
+      }),
+    },
+  ];
+
+  for (const candidate of candidates) {
+    const count = await safeCountByQuery(db, candidate.table, candidate.query);
+    if (count > 0) return count;
+  }
+  return 0;
+}
+
 function formatCustomerName(customer?: CustomerRow): string | null {
   if (!customer) return null;
   const first = customer.first_name?.trim() ?? "";
@@ -503,6 +530,7 @@ export async function GET(req: Request) {
       missingDocuments,
       openSupportRequests,
       failedAutomations24h,
+      retryingAutomations,
       recentBookings,
     ] = await Promise.all([
       getRevenueToday(db, dayWindow),
@@ -512,6 +540,7 @@ export async function GET(req: Request) {
       getMissingDocumentsCount(db),
       countOpenSupportRequestsLast30Days(),
       getFailedAutomations24h(db),
+      getRetryingAutomations(db),
       getRecentBookings(db),
     ]);
     const alerts = await getAlerts(db, {
@@ -530,6 +559,7 @@ export async function GET(req: Request) {
       missingDocuments,
       openSupportRequests,
       failedAutomations24h,
+      retryingAutomations,
       recentBookings,
       alerts,
     };

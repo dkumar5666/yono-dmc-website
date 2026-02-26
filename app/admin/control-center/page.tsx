@@ -39,6 +39,7 @@ interface ControlCenterPayload {
   missingDocuments: number;
   openSupportRequests: number;
   failedAutomations24h: number;
+  retryingAutomations: number;
   recentBookings: ControlCenterRecentBooking[];
   alerts: ControlCenterAlert[];
   dayWindow?: {
@@ -56,6 +57,7 @@ const EMPTY_PAYLOAD: ControlCenterPayload = {
   missingDocuments: 0,
   openSupportRequests: 0,
   failedAutomations24h: 0,
+  retryingAutomations: 0,
   recentBookings: [],
   alerts: [],
 };
@@ -244,6 +246,7 @@ export default function AdminControlCenterPage() {
         missingDocuments: Number(resolved?.missingDocuments ?? 0),
         openSupportRequests: Number(resolved?.openSupportRequests ?? 0),
         failedAutomations24h: Number(resolved?.failedAutomations24h ?? 0),
+        retryingAutomations: Number(resolved?.retryingAutomations ?? 0),
         recentBookings: Array.isArray(resolved?.recentBookings) ? resolved.recentBookings : [],
         alerts: normalizedAlerts,
         dayWindow: resolved?.dayWindow,
@@ -339,6 +342,7 @@ export default function AdminControlCenterPage() {
               <KPISkeletonCard />
               <KPISkeletonCard />
               <KPISkeletonCard />
+              <KPISkeletonCard />
             </>
           ) : (
             <>
@@ -397,6 +401,14 @@ export default function AdminControlCenterPage() {
                 icon={AlertTriangle}
                 accent="border-rose-200 bg-rose-50 text-rose-600"
                 href="/admin/automation/failures?status=failed&since_hours=24"
+              />
+              <MetricCard
+                label="Retries In Progress"
+                value={String(data.retryingAutomations)}
+                note="Automation retries currently running"
+                icon={RefreshCw}
+                accent="border-sky-200 bg-sky-50 text-sky-600"
+                href="/admin/automation/failures?status=retrying"
               />
             </>
           )}

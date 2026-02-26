@@ -77,6 +77,15 @@ function JsonPreview({ value }: { value: unknown }) {
   );
 }
 
+function toRetryHistory(meta: unknown): string[] {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return [];
+  const history = (meta as { retry_history?: unknown }).retry_history;
+  if (!Array.isArray(history)) return [];
+  return history
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+}
+
 export default function AdminAutomationFailureDetailPage() {
   const params = useParams<{ id?: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
@@ -142,6 +151,7 @@ export default function AdminAutomationFailureDetailPage() {
     { key: "payload", label: "Payload", value: failure?.payload ?? null },
     { key: "meta", label: "Meta", value: failure?.meta ?? null },
   ].filter((entry) => entry.value != null);
+  const retryHistory = toRetryHistory(failure?.meta);
 
   const markResolved = useCallback(async () => {
     if (!failureId) return;
@@ -347,6 +357,38 @@ export default function AdminAutomationFailureDetailPage() {
               );
             })}
           </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-slate-900">Retry History</h3>
+          <p className="text-xs text-slate-500">Captured from failure meta.retry_history</p>
+        </div>
+        {loading ? (
+          <div className="space-y-2">
+            <SkeletonLine className="h-10" />
+            <SkeletonLine className="h-10" />
+          </div>
+        ) : retryHistory.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            No retry history recorded
+          </div>
+        ) : (
+          <ol className="space-y-2">
+            {retryHistory
+              .slice()
+              .reverse()
+              .map((timestamp, index) => (
+                <li
+                  key={`${timestamp}-${index}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-slate-700">Retry attempt</span>
+                  <span className="text-slate-600">{formatDateTime(timestamp)}</span>
+                </li>
+              ))}
+          </ol>
         )}
       </section>
 

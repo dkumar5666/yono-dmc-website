@@ -78,6 +78,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     shortLabel: "System Health",
     icon: Activity,
   },
+  {
+    href: "/admin/webhooks/events",
+    label: "Webhook Events",
+    shortLabel: "Webhooks",
+    icon: Activity,
+  },
   { href: "/admin/catalog", label: "Catalog", shortLabel: "Catalog", icon: LayoutDashboard },
   {
     href: "/admin/destinations",

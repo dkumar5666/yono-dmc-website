@@ -86,24 +86,31 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${baseUrl}/login?error=google_profile`);
   }
 
-  const customer = upsertCustomer({
-    provider: "google",
-    providerUserId: user.sub,
-    fullName: user.name,
-    email: user.email,
-  });
+  try {
+    const customer = upsertCustomer({
+      provider: "google",
+      providerUserId: user.sub,
+      fullName: user.name,
+      email: user.email,
+    });
 
-  const token = createCustomerSessionToken({
-    id: customer.id,
-    name: customer.fullName,
-    email: customer.email,
-    phone: customer.phone,
-    provider: "google",
-  });
+    const token = createCustomerSessionToken({
+      id: customer.id,
+      name: customer.fullName,
+      email: customer.email,
+      phone: customer.phone,
+      provider: "google",
+    });
 
-  const response = NextResponse.redirect(`${baseUrl}${nextPath}`);
-  applyCustomerSessionCookie(response, token);
-  clearGoogleStateCookie(response);
-  clearGoogleNextPathCookie(response);
-  return response;
+    const response = NextResponse.redirect(`${baseUrl}${nextPath}`);
+    applyCustomerSessionCookie(response, token);
+    clearGoogleStateCookie(response);
+    clearGoogleNextPathCookie(response);
+    return response;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[google-oauth] callback persistence failed", error);
+    }
+    return NextResponse.redirect(`${baseUrl}/login?error=google_persist`);
+  }
 }

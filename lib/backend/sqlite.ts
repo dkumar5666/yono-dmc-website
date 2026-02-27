@@ -2,17 +2,43 @@ import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-const runtimeDir = path.join(process.cwd(), ".runtime");
-const databaseFile = path.join(runtimeDir, "travel.sqlite");
 const migrationsDir = path.join(process.cwd(), "db", "migrations");
 
 let db: DatabaseSync | null = null;
 let initialized = false;
+let runtimeDir: string | null = null;
+
+function resolveRuntimeDir(): string {
+  if (runtimeDir) return runtimeDir;
+
+  const explicitDir = process.env.SQLITE_RUNTIME_DIR?.trim();
+  const candidates = [
+    explicitDir,
+    path.join(process.cwd(), ".runtime"),
+    path.join("/tmp", "yono-dmc-runtime"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    try {
+      if (!existsSync(candidate)) {
+        mkdirSync(candidate, { recursive: true });
+      }
+      runtimeDir = candidate;
+      return runtimeDir;
+    } catch {
+      // Try the next candidate directory.
+    }
+  }
+
+  throw new Error("Unable to initialize runtime directory for SQLite.");
+}
+
+function getDatabaseFilePath(): string {
+  return path.join(resolveRuntimeDir(), "travel.sqlite");
+}
 
 function ensureRuntimeDir(): void {
-  if (!existsSync(runtimeDir)) {
-    mkdirSync(runtimeDir, { recursive: true });
-  }
+  resolveRuntimeDir();
 }
 
 function runMigrations(database: DatabaseSync): void {
@@ -49,7 +75,7 @@ export function getDb(): DatabaseSync {
   if (db && initialized) return db;
 
   ensureRuntimeDir();
-  db = new DatabaseSync(databaseFile);
+  db = new DatabaseSync(getDatabaseFilePath());
   db.exec("PRAGMA foreign_keys = ON;");
 
   if (!initialized) {

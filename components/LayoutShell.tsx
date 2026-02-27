@@ -14,7 +14,15 @@ const AIChatWidget = dynamic(() => import("@/components/AIChatWidget"), {
   ssr: false,
 });
 
-const HIDE_CHROME_PREFIXES = ["/login", "/signup", "/admin", "/supplier/login", "/agent/login"];
+const HIDE_CHROME_PREFIXES = [
+  "/login",
+  "/signup",
+  "/admin",
+  "/supplier/login",
+  "/agent/login",
+  "/official-login",
+  "/official/login",
+];
 
 function shouldHideChrome(pathname: string): boolean {
   return HIDE_CHROME_PREFIXES.some((prefix) => pathname.startsWith(prefix));

@@ -1,3 +1,5 @@
+import { getAmadeusConfig } from "@/lib/config/amadeus";
+
 interface AmadeusTokenResponse {
   access_token?: string;
   expires_in?: number;
@@ -11,15 +13,11 @@ type TokenCache = {
 let tokenCache: TokenCache | null = null;
 
 function baseUrl(): string {
-  return process.env.AMADEUS_BASE_URL?.trim() || "https://test.api.amadeus.com";
+  return getAmadeusConfig().baseUrl;
 }
 
 function getCredentials() {
-  const clientId = process.env.AMADEUS_CLIENT_ID?.trim();
-  const clientSecret = process.env.AMADEUS_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) {
-    throw new Error("Amadeus credentials are missing");
-  }
+  const { clientId, clientSecret } = getAmadeusConfig();
   return { clientId, clientSecret };
 }
 

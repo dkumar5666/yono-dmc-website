@@ -1,5 +1,6 @@
 import Amadeus from "amadeus";
 import { FlightOfferSummary, FlightSearchRequest } from "@/lib/backend/types";
+import { getAmadeusConfig } from "@/lib/config/amadeus";
 
 interface AmadeusSegment {
   departure?: { iataCode?: string; at?: string };
@@ -74,18 +75,12 @@ let amadeusClient: InstanceType<typeof Amadeus> | null = null;
 function getAmadeusClient(): InstanceType<typeof Amadeus> {
   if (amadeusClient) return amadeusClient;
 
-  const clientId = process.env.AMADEUS_CLIENT_ID?.trim();
-  const clientSecret = process.env.AMADEUS_CLIENT_SECRET?.trim();
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "Amadeus credentials are missing. Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET."
-    );
-  }
+  const { clientId, clientSecret, hostname } = getAmadeusConfig();
 
   amadeusClient = new Amadeus({
     clientId,
     clientSecret,
+    hostname,
   });
 
   return amadeusClient;

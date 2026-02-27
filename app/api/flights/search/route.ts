@@ -4,6 +4,15 @@ import { FlightSearchRequest } from "@/lib/backend/types";
 import { validateFlightSearchRequest } from "@/lib/backend/validation";
 import { enforceRateLimit } from "@/lib/middleware/rateLimit";
 
+function parseAmadeusMissingEnv(message: string): string[] | null {
+  if (!message.startsWith("Missing env:")) return null;
+  return message
+    .replace("Missing env:", "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 export async function POST(req: Request) {
   const rateLimitResponse = enforceRateLimit(req, {
     key: "public:flights-search",
@@ -37,12 +46,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ offers });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    if (message.includes("Amadeus credentials are missing")) {
+    const missingEnv = parseAmadeusMissingEnv(message);
+    if (missingEnv) {
       return NextResponse.json(
         {
           error: "Flight provider is not configured",
           code: "FLIGHT_PROVIDER_NOT_CONFIGURED",
-          missingEnv: ["AMADEUS_CLIENT_ID", "AMADEUS_CLIENT_SECRET"],
+          missingEnv,
+        },
+        { status: 503 }
+      );
+    }
+    if (message.includes("Invalid env: AMADEUS_BASE_URL")) {
+      return NextResponse.json(
+        {
+          error: "Flight provider base URL is invalid",
+          code: "FLIGHT_PROVIDER_INVALID_CONFIG",
         },
         { status: 503 }
       );

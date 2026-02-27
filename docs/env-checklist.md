@@ -11,8 +11,10 @@
 - `PEXELS_API_KEY`
 
 ### Flights (Amadeus)
+- `AMADEUS_ENV`
 - `AMADEUS_CLIENT_ID`
 - `AMADEUS_CLIENT_SECRET`
+- `AMADEUS_BASE_URL`
 
 ### Admin Auth
 - `AUTH_SESSION_SECRET`
@@ -37,8 +39,10 @@
 ## Current Local Status (from key-name audit)
 
 ### Present
+- `AMADEUS_ENV`
 - `AMADEUS_CLIENT_ID`
 - `AMADEUS_CLIENT_SECRET`
+- `AMADEUS_BASE_URL`
 - `PEXELS_API_KEY`
 - `AUTH_SESSION_SECRET`
 - `ADMIN_USERNAME`
@@ -57,6 +61,9 @@
 - `NEXTAUTH_SECRET`
 
 ## Provider Notes
+- Amadeus expected naming:
+  - `AMADEUS_ENV`
+  - `AMADEUS_BASE_URL` should be a valid URL, e.g. `https://test.api.amadeus.com`
 - Google OAuth redirect URI must include:
   - `{NEXTAUTH_URL}/api/customer-auth/google/callback`
 - Twilio Verify must have an active Verify Service SID:

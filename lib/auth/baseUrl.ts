@@ -1,5 +1,13 @@
 function normalizeBaseUrl(value: string): string {
-  return value.trim().replace(/\/+$/, "");
+  const raw = value.trim().replace(/\/+$/, "");
+  if (!raw) return "";
+
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return "";
+  }
 }
 
 function firstHeaderValue(value: string | null): string {
@@ -18,7 +26,8 @@ export function getPublicBaseUrl(req: Request): string {
     process.env.NEXTAUTH_URL?.trim();
 
   if (envBase) {
-    return normalizeBaseUrl(envBase);
+    const normalizedEnv = normalizeBaseUrl(envBase);
+    if (normalizedEnv) return normalizedEnv;
   }
 
   const proto = firstHeaderValue(req.headers.get("x-forwarded-proto")) || "https";
@@ -30,6 +39,6 @@ export function getPublicBaseUrl(req: Request): string {
     return `${proto}://${host}`;
   }
 
-  return normalizeBaseUrl(new URL(req.url).origin);
+  const origin = normalizeBaseUrl(new URL(req.url).origin);
+  return origin || "https://www.yonodmc.in";
 }
-

@@ -49,8 +49,6 @@ export async function GET(req: Request) {
     const baseUrl = getPublicBaseUrl(req);
     const nextPathRaw = readGoogleNextPathFromRequest(req);
     const nextPath = nextPathRaw === "/" ? "/my-trips" : sanitizeNextPath(nextPathRaw);
-    const hasCodeParam = Boolean(url.searchParams.get("code"));
-    const hasStateParam = Boolean(url.searchParams.get("state"));
     const providerError = url.searchParams.get("error");
 
     if (providerError) {
@@ -74,6 +72,18 @@ export async function GET(req: Request) {
       console.error("[google-oauth] missing env vars", {
         hasClientId: Boolean(clientId),
         hasClientSecret: Boolean(clientSecret),
+      });
+      return loginErrorRedirect(baseUrl, "google_oauth_not_configured");
+    }
+
+    const hasSessionSecret = Boolean(
+      process.env.AUTH_SESSION_SECRET?.trim() ||
+        process.env.NEXTAUTH_SECRET?.trim()
+    );
+    if (process.env.NODE_ENV === "production" && !hasSessionSecret) {
+      console.error("[google-oauth] missing session secret", {
+        hasAuthSessionSecret: Boolean(process.env.AUTH_SESSION_SECRET?.trim()),
+        hasNextAuthSecret: Boolean(process.env.NEXTAUTH_SECRET?.trim()),
       });
       return loginErrorRedirect(baseUrl, "google_oauth_not_configured");
     }

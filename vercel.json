@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/internal/automation/retry?key=164723841906d88sgvqtt296igv8ncgs",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
+{}

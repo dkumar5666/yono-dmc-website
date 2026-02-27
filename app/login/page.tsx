@@ -81,10 +81,20 @@ function LoginPageContent() {
     if (!oauthError) return;
     const errorMap: Record<string, string> = {
       google_state: "Google login session expired. Please try again.",
+      google_state_mismatch: "Google login session expired. Please try again.",
       google_env: "Google login is not configured correctly.",
+      google_oauth_not_configured: "Google login is not configured correctly.",
       google_token: "Unable to complete Google login token exchange.",
+      google_token_exchange_failed: "Unable to complete Google login token exchange.",
       google_userinfo: "Unable to fetch Google profile.",
+      google_userinfo_failed: "Unable to fetch Google profile.",
       google_profile: "Google account profile is incomplete.",
+      google_profile_missing: "Google account profile is incomplete.",
+      google_missing_code: "Google callback did not include an authorization code.",
+      google_email_missing: "Google account email is required to continue.",
+      google_provider_error: "Google login was cancelled or failed at provider.",
+      google_auth_failed: "Google login failed due to a server error. Please try again.",
+      google_persist: "Unable to complete Google login. Please try again.",
     };
     setError(errorMap[oauthError] ?? "Google login failed. Please try again.");
   }, [oauthError]);

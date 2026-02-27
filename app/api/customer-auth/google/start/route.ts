@@ -27,7 +27,10 @@ export async function GET(req: Request) {
   }
 
   const requestUrl = new URL(req.url);
-  const nextPath = sanitizeNextPath(requestUrl.searchParams.get("next"));
+  const requestedNextPath = requestUrl.searchParams.get("next");
+  const nextPath = requestedNextPath
+    ? sanitizeNextPath(requestedNextPath)
+    : "/my-trips";
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();

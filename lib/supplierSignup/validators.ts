@@ -1,15 +1,21 @@
 export const SUPPLIER_BUSINESS_TYPES = [
   "Airline",
   "Hotel",
-  "Apartment / Villa / Homestay",
-  "Visa Agency / Aggregator",
-  "Cruise Line",
-  "Transport Company (Bus/Cabs)",
-  "Train Service Provider / Agent",
-  "Forex Agency",
-  "Insurance Company",
-  "Activities / Attractions Provider",
-  "Other",
+  "Apartment",
+  "Visa",
+  "Cruise",
+  "Bus",
+  "Cabs",
+  "Train",
+  "Forex",
+  "Insurance",
+  "Attractions",
+  "Travel Agent",
+  "Travel Agency",
+  "Tour Operator",
+  "DMC (Destination Management Comapny)",
+  "Transportor",
+  "Others",
 ] as const;
 
 export const REQUIRED_DOC_TYPES = [
@@ -119,7 +125,7 @@ function normalizeBusinessType(value: unknown): string {
   const found = SUPPLIER_BUSINESS_TYPES.find(
     (entry) => entry.toLowerCase() === raw.toLowerCase()
   );
-  return found || raw;
+  return found || "";
 }
 
 function normalizeCountry(value: unknown): string {
@@ -131,6 +137,7 @@ export function validateSupplierSignupRequestPayload(payload: unknown): Validati
   const body = safeObject(payload);
   const errors: string[] = [];
 
+  const rawBusinessType = safeString(body.business_type);
   const business_type = normalizeBusinessType(body.business_type);
   const company_legal_name = safeString(body.company_legal_name);
   const brand_name = safeString(body.brand_name);
@@ -150,7 +157,11 @@ export function validateSupplierSignupRequestPayload(payload: unknown): Validati
   const license_no = safeString(body.license_no);
   const bank_meta = safeObject(body.bank_meta);
 
-  if (!business_type) errors.push("Business type is required.");
+  if (!rawBusinessType) {
+    errors.push("Business type is required.");
+  } else if (!business_type) {
+    errors.push("Invalid business type.");
+  }
   if (!company_legal_name) errors.push("Company legal name is required.");
   if (!address) errors.push("Registered address is required.");
   if (!city) errors.push("City is required.");

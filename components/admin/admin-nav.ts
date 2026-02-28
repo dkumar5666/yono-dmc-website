@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   Bot,
   Building2,
   ClipboardList,
@@ -13,8 +14,11 @@ import {
   MapPinned,
   Newspaper,
   PackagePlus,
+  IndianRupee,
   RotateCcw,
+  Sparkles,
   ShieldCheck,
+  Wrench,
 } from "lucide-react";
 
 export interface AdminNavItem {
@@ -26,10 +30,52 @@ export interface AdminNavItem {
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
+    href: "/admin/business/dashboard",
+    label: "Business Dashboard",
+    shortLabel: "Business",
+    icon: BarChart3,
+  },
+  {
     href: "/admin/control-center",
     label: "Control Center",
     shortLabel: "Control",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/admin/crm/leads",
+    label: "CRM (Leads)",
+    shortLabel: "CRM",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/crm/outreach",
+    label: "CRM Outreach",
+    shortLabel: "Outreach",
+    icon: Activity,
+  },
+  {
+    href: "/admin/copilot",
+    label: "Ops Copilot",
+    shortLabel: "Copilot",
+    icon: Bot,
+  },
+  {
+    href: "/admin/revenue/optimizer",
+    label: "Revenue Optimizer",
+    shortLabel: "Revenue",
+    icon: Sparkles,
+  },
+  {
+    href: "/admin/pricing/rules",
+    label: "Pricing Rules",
+    shortLabel: "Pricing",
+    icon: IndianRupee,
+  },
+  {
+    href: "/admin/pricing/versions",
+    label: "Pricing Versions",
+    shortLabel: "Price Ver",
+    icon: IndianRupee,
   },
   {
     href: "/admin/bookings",
@@ -68,6 +114,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     icon: Activity,
   },
   {
+    href: "/admin/suppliers/requests",
+    label: "Supplier Requests",
+    shortLabel: "Supplier Req",
+    icon: Building2,
+  },
+  {
     href: "/admin/support-requests",
     label: "Support Requests",
     shortLabel: "Support",
@@ -78,6 +130,24 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "System Health",
     shortLabel: "System Health",
     icon: Activity,
+  },
+  {
+    href: "/admin/system/env-check",
+    label: "Env Check",
+    shortLabel: "Env",
+    icon: ShieldCheck,
+  },
+  {
+    href: "/admin/system/smoke-tests",
+    label: "Smoke Tests",
+    shortLabel: "Smoke",
+    icon: ShieldCheck,
+  },
+  {
+    href: "/admin/ops/toolkit",
+    label: "Ops Toolkit",
+    shortLabel: "Ops",
+    icon: Wrench,
   },
   {
     href: "/admin/auth/diagnostics",

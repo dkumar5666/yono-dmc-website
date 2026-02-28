@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 
 interface ApiErrorShape {
@@ -145,7 +146,16 @@ export default function SupplierLoginCard() {
           {success}
         </div>
       ) : null}
+
+      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <Link
+          href="/supplier/signup"
+          className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:border-slate-400"
+        >
+          Sign up
+        </Link>
+        <p className="mt-2 text-center text-xs text-slate-600">Request a supplier account (approval required)</p>
+      </div>
     </div>
   );
 }
-

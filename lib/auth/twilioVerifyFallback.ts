@@ -43,7 +43,12 @@ export function isTwilioVerifyConfigured(): boolean {
   return getTwilioVerifyConfig().ok;
 }
 
-export async function sendOtpWithTwilio(phone: string): Promise<{ challengeId?: string }> {
+type TwilioVerifyChannel = "sms" | "email";
+
+async function sendOtpWithTwilioTarget(params: {
+  to: string;
+  channel: TwilioVerifyChannel;
+}): Promise<{ challengeId?: string }> {
   const config = getTwilioVerifyConfig();
   if (!config.ok) {
     throw new TwilioVerifyUnavailableError(config.error.message);
@@ -53,8 +58,8 @@ export async function sendOtpWithTwilio(phone: string): Promise<{ challengeId?: 
   const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
   const apiUrl = `${TWILIO_VERIFY_API_BASE}/Services/${verifyServiceSid}/Verifications`;
   const payload = new URLSearchParams({
-    To: phone,
-    Channel: "sms",
+    To: params.to,
+    Channel: params.channel,
   });
 
   const response = await fetch(apiUrl, {
@@ -81,8 +86,16 @@ export async function sendOtpWithTwilio(phone: string): Promise<{ challengeId?: 
   return { challengeId };
 }
 
-export async function verifyOtpWithTwilio(params: {
-  phone: string;
+export async function sendOtpWithTwilio(phone: string): Promise<{ challengeId?: string }> {
+  return sendOtpWithTwilioTarget({ to: phone, channel: "sms" });
+}
+
+export async function sendEmailOtpWithTwilio(email: string): Promise<{ challengeId?: string }> {
+  return sendOtpWithTwilioTarget({ to: email, channel: "email" });
+}
+
+async function verifyOtpWithTwilioTarget(params: {
+  to: string;
   token: string;
 }): Promise<{ approved: boolean; challengeId?: string; status?: string }> {
   const config = getTwilioVerifyConfig();
@@ -94,7 +107,7 @@ export async function verifyOtpWithTwilio(params: {
   const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
   const apiUrl = `${TWILIO_VERIFY_API_BASE}/Services/${verifyServiceSid}/VerificationCheck`;
   const payload = new URLSearchParams({
-    To: params.phone,
+    To: params.to,
     Code: params.token,
   });
 
@@ -125,4 +138,18 @@ export async function verifyOtpWithTwilio(params: {
     challengeId,
     status,
   };
+}
+
+export async function verifyOtpWithTwilio(params: {
+  phone: string;
+  token: string;
+}): Promise<{ approved: boolean; challengeId?: string; status?: string }> {
+  return verifyOtpWithTwilioTarget({ to: params.phone, token: params.token });
+}
+
+export async function verifyEmailOtpWithTwilio(params: {
+  email: string;
+  token: string;
+}): Promise<{ approved: boolean; challengeId?: string; status?: string }> {
+  return verifyOtpWithTwilioTarget({ to: params.email, token: params.token });
 }

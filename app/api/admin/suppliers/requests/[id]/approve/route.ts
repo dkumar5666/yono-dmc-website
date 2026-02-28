@@ -3,7 +3,6 @@ import { writeAdminAuditLog } from "@/lib/admin/admin-audit";
 import { ensureIdentityProfile } from "@/lib/auth/identityProfiles";
 import { getPublicBaseUrl } from "@/lib/auth/baseUrl";
 import { getSupabaseConfig, SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
-import { sendWhatsAppTemplate } from "@/lib/integrations/aisensy";
 import { requireRole } from "@/lib/middleware/requireRole";
 import {
   getSupplierSignupRequestById,
@@ -26,6 +25,11 @@ function safeString(value: unknown): string {
 function safeObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
+}
+
+function maskPhone(value: string): string {
+  if (value.length <= 4) return value;
+  return `${"*".repeat(Math.max(0, value.length - 4))}${value.slice(-4)}`;
 }
 
 function mapBusinessTypeToSupplierType(value: string): string {
@@ -184,39 +188,81 @@ async function sendSupplierApprovalNotifications(params: {
     return { whatsappSent: false, whatsappSkipped: true };
   }
 
-  const waResult = await sendWhatsAppTemplate({
-    to: phone,
-    template: "supplier_account_approved",
-    variables: {
+  const apiKey = safeString(process.env.AISENSY_API_KEY);
+  const baseUrl = safeString(process.env.AISENSY_BASE_URL) || "https://backend.aisensy.com";
+  const senderId = safeString(process.env.AISENSY_SENDER_ID);
+  if (!apiKey) {
+    await logSupplierSignupSystemEvent(params.db, {
+      requestId: params.requestId,
+      event: "supplier_signup_approval_whatsapp_skipped",
+      message: "Supplier approval WhatsApp skipped: missing AISENSY_API_KEY.",
+      meta: { skipped: true, reason: "missing_config" },
+    });
+    return { whatsappSent: false, whatsappSkipped: true };
+  }
+
+  const payload: Record<string, unknown> = {
+    destination: phone,
+    templateName: "supplier_account_approved",
+    campaignName: "supplier_account_approved",
+    params: {
       name: params.contactName || params.companyName || "Partner",
       login_url: params.loginUrl,
       setup_url: params.recoveryLink || params.loginUrl,
     },
-  });
+    userName: params.contactName || params.companyName || maskPhone(phone),
+  };
+  if (senderId) {
+    payload.sender = senderId;
+    payload.senderId = senderId;
+  }
+
+  let ok = false;
+  let status = 0;
+  let error = "";
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/campaign/t1/api/v2`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    status = response.status;
+    ok = response.ok;
+    if (!response.ok) {
+      error = "request_failed";
+    }
+  } catch (err) {
+    error = err instanceof Error ? err.message : "request_failed";
+  }
 
   await logSupplierSignupSystemEvent(params.db, {
     requestId: params.requestId,
-    event: waResult.ok
+    event: ok
       ? "supplier_signup_approval_whatsapp_sent"
-      : waResult.skipped
-      ? "supplier_signup_approval_whatsapp_skipped"
       : "supplier_signup_approval_whatsapp_failed",
-    message: waResult.ok
+    message: ok
       ? "Supplier approval WhatsApp sent."
-      : waResult.skipped
-      ? "Supplier approval WhatsApp skipped."
       : "Supplier approval WhatsApp failed.",
     meta: {
-      provider: "aisensy",
-      skipped: Boolean(waResult.skipped),
-      status: waResult.status || null,
-      error: waResult.error || null,
+      provider: "aisensy_direct",
+      skipped: false,
+      status: status || null,
+      error: error || null,
     },
   });
 
   return {
-    whatsappSent: waResult.ok,
-    whatsappSkipped: Boolean(waResult.skipped),
+    whatsappSent: ok,
+    whatsappSkipped: false,
   };
 }
 

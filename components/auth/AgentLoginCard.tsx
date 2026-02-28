@@ -268,7 +268,7 @@ export default function AgentLoginCard() {
 
       <div className="mt-5 text-sm">
         <Link
-          href={`/signup?role=agent&next=${encodeURIComponent(nextPath)}`}
+          href={`/agent/signup?next=${encodeURIComponent(nextPath)}`}
           className="font-semibold text-sky-600 hover:text-sky-700"
         >
           Need an agent account? Create account

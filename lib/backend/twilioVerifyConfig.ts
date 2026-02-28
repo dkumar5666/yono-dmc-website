@@ -26,7 +26,8 @@ export function getTwilioVerifyConfig():
   | { ok: false; error: TwilioVerifyConfigError } {
   const accountSid = readEnv("TWILIO_ACCOUNT_SID");
   const authToken = readEnv("TWILIO_AUTH_TOKEN");
-  const verifyServiceSid = readEnv("TWILIO_VERIFY_SERVICE_SID");
+  const verifyServiceSid =
+    readEnv("TWILIO_VERIFY_SERVICE_SID") || readEnv("TWILIO_VERIFY_SID");
 
   if (!accountSid || !authToken || !verifyServiceSid) {
     return {
@@ -34,7 +35,7 @@ export function getTwilioVerifyConfig():
       error: {
         code: "TWILIO_ENV_MISSING",
         message:
-          "Twilio Verify environment variables are missing. Required: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID",
+          "Twilio Verify environment variables are missing. Required: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID (or TWILIO_VERIFY_SID)",
       },
     };
   }
@@ -59,4 +60,3 @@ export function getTwilioVerifyConfig():
     },
   };
 }
-

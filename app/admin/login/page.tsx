@@ -17,7 +17,7 @@ export default async function AdminLoginPage() {
     <AuthShell
       title="Admin Login"
       subtitle="For Yono DMC staff access to admin and operations tools."
-      roleBadge="Office"
+      hideBrandName
       highlightsTitle="Access Scope"
       highlights={["Control Center", "Operations workflows", "Security-audited access"]}
     >

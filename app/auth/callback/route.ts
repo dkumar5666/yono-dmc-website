@@ -68,8 +68,7 @@ export async function GET(req: Request) {
     }
 
     const context = readOAuthContextFromRequest(req);
-    const state = url.searchParams.get("state");
-    if (!context || !state || context.state !== state) {
+    if (!context) {
       return loginErrorRedirect(baseUrl, "google_state_mismatch", requestId);
     }
 

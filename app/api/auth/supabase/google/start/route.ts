@@ -5,7 +5,6 @@ import {
   applyOAuthContextCookie,
   createPkcePair,
   normalizeRole,
-  randomState,
   sanitizeNextPath,
 } from "@/lib/auth/supabaseSession";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
@@ -55,20 +54,17 @@ export async function GET(req: Request) {
   const officeAddress = shortText(requestUrl.searchParams.get("office_address"), 250);
   const city = shortText(requestUrl.searchParams.get("city"), 80);
 
-  const state = randomState();
   const pkce = createPkcePair();
   const redirectUri = `${baseUrl}/auth/callback`;
   const authorizeUrl = new URL(`${config.url}/auth/v1/authorize`);
   authorizeUrl.searchParams.set("provider", "google");
   authorizeUrl.searchParams.set("redirect_to", redirectUri);
-  authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("code_challenge", pkce.challenge);
   authorizeUrl.searchParams.set("code_challenge_method", "s256");
 
   const response = NextResponse.redirect(authorizeUrl);
   response.headers.set("x-request-id", requestId);
   applyOAuthContextCookie(response, {
-    state,
     verifier: pkce.verifier,
     nextPath,
     role,

@@ -16,7 +16,6 @@ export interface SupabaseSessionCookiePayload {
 }
 
 interface OAuthContextPayload {
-  state: string;
   verifier: string;
   nextPath: string;
   role?: IdentityRole;
@@ -51,6 +50,47 @@ type CookieStoreLike = {
 export const SUPABASE_SESSION_COOKIE_NAME = "yono_supabase_session";
 export const SUPABASE_OAUTH_CONTEXT_COOKIE_NAME = "yono_supabase_oauth_context";
 export const SUPABASE_OTP_CONTEXT_COOKIE_NAME = "yono_supabase_otp_context";
+
+function normalizeUrlHost(value: string): string {
+  const raw = value.trim();
+  if (!raw) return "";
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return new URL(withScheme).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function resolveCookieDomain(): string | undefined {
+  if (process.env.NODE_ENV !== "production") return undefined;
+
+  const explicit = process.env.AUTH_COOKIE_DOMAIN?.trim();
+  if (explicit) return explicit;
+
+  const host = normalizeUrlHost(
+    process.env.SITE_URL?.trim() ||
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+      process.env.APP_URL?.trim() ||
+      ""
+  );
+  if (!host || host === "localhost") return undefined;
+
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length < 2) return undefined;
+  return `.${parts.slice(-2).join(".")}`;
+}
+
+function cookieBaseOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+    domain: resolveCookieDomain(),
+  };
+}
 
 function base64UrlEncode(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
@@ -182,21 +222,13 @@ export function applySupabaseSessionCookie(
   };
 
   response.cookies.set(SUPABASE_SESSION_COOKIE_NAME, encodeSignedPayload(payload), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    ...cookieBaseOptions(60 * 60 * 24 * 30),
   });
 }
 
 export function clearSupabaseSessionCookie(response: NextResponse): void {
   response.cookies.set(SUPABASE_SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
+    ...cookieBaseOptions(0),
   });
 }
 
@@ -241,7 +273,6 @@ export function readSupabaseSessionFromCookieStore(
 export function applyOAuthContextCookie(
   response: NextResponse,
   context: {
-    state: string;
     verifier: string;
     nextPath: string;
     role?: IdentityRole;
@@ -254,7 +285,6 @@ export function applyOAuthContextCookie(
   }
 ): void {
   const payload: OAuthContextPayload = {
-    state: context.state,
     verifier: context.verifier,
     nextPath: sanitizeNextPath(context.nextPath),
     role: context.role,
@@ -268,11 +298,7 @@ export function applyOAuthContextCookie(
   };
 
   response.cookies.set(SUPABASE_OAUTH_CONTEXT_COOKIE_NAME, encodeSignedPayload(payload), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 10,
+    ...cookieBaseOptions(60 * 10),
   });
 }
 
@@ -280,18 +306,14 @@ export function readOAuthContextFromRequest(req: Request): OAuthContextPayload |
   const token = parseCookieHeader(req, SUPABASE_OAUTH_CONTEXT_COOKIE_NAME);
   if (!token) return null;
   const payload = decodeSignedPayload<OAuthContextPayload>(token);
-  if (!payload || !payload.state || !payload.verifier || !payload.nextPath || !payload.exp) return null;
+  if (!payload || !payload.verifier || !payload.nextPath || !payload.exp) return null;
   if (payload.exp < Date.now()) return null;
   return payload;
 }
 
 export function clearOAuthContextCookie(response: NextResponse): void {
   response.cookies.set(SUPABASE_OAUTH_CONTEXT_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
+    ...cookieBaseOptions(0),
   });
 }
 
@@ -305,11 +327,7 @@ export function applyOtpContextCookie(
     exp: Date.now() + 10 * 60 * 1000,
   };
   response.cookies.set(SUPABASE_OTP_CONTEXT_COOKIE_NAME, encodeSignedPayload(payload), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 10,
+    ...cookieBaseOptions(60 * 10),
   });
 }
 
@@ -324,10 +342,6 @@ export function readOtpContextFromRequest(req: Request): OtpContextPayload | nul
 
 export function clearOtpContextCookie(response: NextResponse): void {
   response.cookies.set(SUPABASE_OTP_CONTEXT_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
+    ...cookieBaseOptions(0),
   });
 }

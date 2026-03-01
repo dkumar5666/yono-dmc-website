@@ -12,6 +12,7 @@ import {
 import { executeGuardedSupplierBooking } from "@/lib/backend/supplierBooking";
 import { SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
 import { routeError } from "@/lib/middleware/routeError";
+import { isStagingMode, isSupplierBookingAllowedInStaging } from "@/lib/config/appMode";
 
 type HotelBookRequestBody = {
   booking_id?: string;
@@ -315,6 +316,16 @@ export async function POST(req: Request) {
       );
     }
 
+    if (isStagingMode() && !isSupplierBookingAllowedInStaging()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier booking is disabled in staging mode",
+        },
+        { status: 403 }
+      );
+    }
+
     const existingHotelItemId = await findHotelBookingItemId(booking.id);
     const offerRef = extractHotelOfferRef(hotelOffer);
     const ref = existingHotelItemId || offerRef || hashObject(hotelOffer).slice(0, 16) || "na";
@@ -424,4 +435,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
-

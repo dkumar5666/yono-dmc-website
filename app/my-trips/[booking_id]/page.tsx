@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCustomerPortalSession, getCustomerTripDetail } from "@/lib/backend/customerTripsPortal";
+import { requirePortalRole } from "@/lib/auth/requirePortalRole";
+import { getCustomerProfileCompletionStatus } from "@/lib/backend/customerAccount";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,14 @@ function StatusBadge({ label }: { label?: string | null }) {
   );
 }
 
+function normalizeDocumentType(value: string): "invoice" | "booking_confirmation" | "itinerary_summary" | "other" {
+  const normalized = value.trim().toLowerCase().replaceAll("-", "_");
+  if (normalized === "invoice") return "invoice";
+  if (normalized === "voucher" || normalized === "booking_confirmation") return "booking_confirmation";
+  if (normalized === "itinerary" || normalized === "itinerary_summary") return "itinerary_summary";
+  return "other";
+}
+
 export default async function MyTripDetailPage({
   params,
 }: {
@@ -49,6 +59,10 @@ export default async function MyTripDetailPage({
 }) {
   const resolved = "then" in params ? await params : params;
   const bookingParam = decodeURIComponent(resolved.booking_id ?? "").trim();
+  await requirePortalRole("customer", {
+    loginPath: "/login",
+    nextPath: `/my-trips/${encodeURIComponent(bookingParam)}`,
+  });
 
   const cookieStore = await cookies();
   const session = await getCustomerPortalSession(cookieStore);
@@ -56,9 +70,34 @@ export default async function MyTripDetailPage({
   if (!session) {
     redirect(`/login?next=${encodeURIComponent(`/my-trips/${bookingParam}`)}`);
   }
+  if (session.provider === "supabase" && !session.phone) {
+    redirect(`/login?next=${encodeURIComponent(`/my-trips/${bookingParam}`)}&require_mobile_otp=1`);
+  }
+  if (session.provider === "supabase") {
+    const profileCompleted = await getCustomerProfileCompletionStatus(session.id);
+    if (!profileCompleted) {
+      redirect("/account/onboarding");
+    }
+  }
 
   const detail = await getCustomerTripDetail(session, bookingParam);
   const booking = detail.booking;
+  const requiredDocs = [
+    { key: "invoice" as const, label: "Invoice" },
+    { key: "booking_confirmation" as const, label: "Booking Confirmation (Voucher)" },
+    { key: "itinerary_summary" as const, label: "Itinerary Summary" },
+  ];
+  const docsByType = new Map<
+    "invoice" | "booking_confirmation" | "itinerary_summary",
+    (typeof detail.documents)[number]
+  >();
+  for (const doc of detail.documents) {
+    const normalizedType = normalizeDocumentType(safeString(doc.type));
+    if (normalizedType === "other") continue;
+    if (!docsByType.has(normalizedType)) {
+      docsByType.set(normalizedType, doc);
+    }
+  }
 
   if (!booking) {
     return (
@@ -142,29 +181,36 @@ export default async function MyTripDetailPage({
           <h2 className="text-base font-semibold text-slate-900">Documents</h2>
           <p className="text-xs text-slate-500">Download invoices, vouchers, itinerary and tickets if available.</p>
         </div>
+        <div className="space-y-2">
+          {requiredDocs.map((docMeta) => {
+            const doc = docsByType.get(docMeta.key);
+            const status = safeString(doc?.status).toLowerCase();
+            const hasUrl = Boolean(safeString(doc?.url));
+            const isPending =
+              !doc ||
+              !hasUrl ||
+              status === "pending" ||
+              status === "failed" ||
+              status === "generating";
 
-        {detail.documents.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            No documents available yet.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {detail.documents.map((doc, index) => (
+            return (
               <div
-                key={`${doc.id ?? "doc"}-${index}`}
+                key={docMeta.key}
                 className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge label={doc.type} />
+                    <StatusBadge label={docMeta.label} />
                     <p className="truncate text-sm font-medium text-slate-900">
-                      {safeString(doc.name) || "Document"}
+                      {safeString(doc?.name) || docMeta.label}
                     </p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{formatDate(doc.created_at)}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {doc ? formatDate(doc.created_at) : "Generating… please check later"}
+                  </p>
                 </div>
 
-                {safeString(doc.url) ? (
+                {!isPending && safeString(doc?.url) ? (
                   <a
                     href={doc.url!}
                     target="_blank"
@@ -175,13 +221,13 @@ export default async function MyTripDetailPage({
                   </a>
                 ) : (
                   <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                    Not available
+                    Generating… please check later
                   </span>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </section>
 
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

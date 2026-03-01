@@ -7,6 +7,7 @@ import { getBookingById, getPaymentIntentById, updateBookingFields } from "@/lib
 import { executeGuardedSupplierBooking } from "@/lib/backend/supplierBooking";
 import { SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
 import { routeError } from "@/lib/middleware/routeError";
+import { isStagingMode, isSupplierBookingAllowedInStaging } from "@/lib/config/appMode";
 
 type FlightBookRequestBody = {
   booking_id?: string;
@@ -231,6 +232,16 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: "Payment must be confirmed before supplier booking" },
         { status: 400 }
+      );
+    }
+
+    if (isStagingMode() && !isSupplierBookingAllowedInStaging()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Supplier booking is disabled in staging mode",
+        },
+        { status: 403 }
       );
     }
 

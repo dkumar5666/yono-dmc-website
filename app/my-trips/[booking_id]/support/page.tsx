@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import TripSupportRequestForm from "@/components/customer/TripSupportRequestForm";
 import { getCustomerPortalSession, getCustomerTripDetail } from "@/lib/backend/customerTripsPortal";
+import { requirePortalRole } from "@/lib/auth/requirePortalRole";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ export default async function MyTripSupportPage({
 }) {
   const resolved = "then" in params ? await params : params;
   const bookingParam = decodeURIComponent(resolved.booking_id ?? "").trim();
+  await requirePortalRole("customer", {
+    loginPath: "/login",
+    nextPath: `/my-trips/${encodeURIComponent(bookingParam)}/support`,
+  });
 
   const cookieStore = await cookies();
   const session = await getCustomerPortalSession(cookieStore);
@@ -39,6 +44,9 @@ export default async function MyTripSupportPage({
 
   if (!session) {
     redirect(`/login?next=${encodeURIComponent(`${bookingHref}/support`)}`);
+  }
+  if (session.provider === "supabase" && !session.phone) {
+    redirect(`/login?next=${encodeURIComponent(`${bookingHref}/support`)}&require_mobile_otp=1`);
   }
 
   const detail = await getCustomerTripDetail(session, bookingParam);
@@ -116,4 +124,3 @@ export default async function MyTripSupportPage({
     </section>
   );
 }
-

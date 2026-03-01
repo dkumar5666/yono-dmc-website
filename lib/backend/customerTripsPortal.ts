@@ -36,6 +36,7 @@ export interface CustomerTripDocument {
   type: string | null;
   name: string | null;
   url: string | null;
+  status: string | null;
   created_at: string | null;
 }
 
@@ -233,7 +234,7 @@ async function fetchDocumentsForBooking(db: SupabaseRestClient, bookingRow: Gene
     if (!bookingIdValue) continue;
     attempts.push(
       new URLSearchParams({
-        select: "id,type,name,url,public_url,created_at,metadata,storage_path,file_path",
+        select: "id,type,name,url,public_url,status,created_at,metadata,storage_path,file_path",
         booking_id: `eq.${bookingIdValue}`,
         order: "created_at.desc",
         limit: "20",
@@ -256,9 +257,10 @@ async function fetchDocumentsForBooking(db: SupabaseRestClient, bookingRow: Gene
 
   return rows.map((row) => ({
     id: safeString(row.id) || null,
-    type: safeString(row.type) || null,
+    type: safeString(row.type) || safeString(row.document_type) || null,
     name: deriveDocumentName(row),
-    url: safeString(row.url) || safeString(row.public_url) || null,
+    url: safeString(row.url) || safeString(row.public_url) || safeString(row.file_url) || null,
+    status: safeString(row.status) || null,
     created_at: safeString(row.created_at) || null,
   }));
 }
@@ -319,7 +321,7 @@ export async function getCustomerPortalSession(cookieStore: CookieStore): Promis
   if (supabaseSession) {
     const profile = await getIdentityProfileByUserId(supabaseSession.userId);
     const role = profile?.role || supabaseSession.role || "customer";
-    if (role !== "customer" && role !== "agent") {
+    if (role !== "customer") {
       return null;
     }
     return {

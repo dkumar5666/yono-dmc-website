@@ -13,6 +13,7 @@ import {
   SupabaseAuthUnavailableError,
 } from "@/lib/auth/supabaseAuthProvider";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
+import { getCustomerProfileCompletionStatus } from "@/lib/backend/customerAccount";
 
 function loginErrorRedirect(baseUrl: string, code: string, requestId: string): NextResponse {
   const response = NextResponse.redirect(
@@ -96,14 +97,28 @@ export async function GET(req: Request) {
     });
 
     const role = profile?.role;
-    const response = NextResponse.redirect(`${baseUrl}${postLoginPath(role, context.nextPath)}`);
+    const resolvedRole = role || context.role || "customer";
+    let targetPath = postLoginPath(resolvedRole, context.nextPath);
+    if (resolvedRole === "customer" && targetPath === "/my-trips") {
+      const completed = await getCustomerProfileCompletionStatus(userId);
+      if (!completed) {
+        targetPath = "/account/onboarding";
+      }
+    }
+    const resolvedPhone = tokenPayload.user?.phone || profile?.phone || undefined;
+    const requiresPhoneVerification = resolvedRole === "customer" && !resolvedPhone;
+    const redirectPath = requiresPhoneVerification
+      ? `/login?next=${encodeURIComponent(targetPath)}&require_mobile_otp=1`
+      : targetPath;
+
+    const response = NextResponse.redirect(`${baseUrl}${redirectPath}`);
     response.headers.set("x-request-id", requestId);
     applySupabaseSessionCookie(response, tokenPayload, {
       userId,
       email: tokenPayload.user?.email || profile?.email || undefined,
-      phone: tokenPayload.user?.phone || profile?.phone || undefined,
+      phone: resolvedPhone,
       fullName: context.fullName || safeUserName(tokenPayload.user) || profile?.full_name || undefined,
-      role,
+      role: resolvedRole,
     });
     clearOAuthContextCookie(response);
 
@@ -113,7 +128,8 @@ export async function GET(req: Request) {
         requestId,
         route: "/auth/callback",
         outcome: "success",
-        role: role || "customer",
+        role: resolvedRole,
+        requiresPhoneVerification,
       },
       req
     );

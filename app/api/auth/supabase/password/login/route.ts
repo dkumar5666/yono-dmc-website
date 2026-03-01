@@ -13,6 +13,7 @@ interface PasswordLoginBody {
   email?: string;
   password?: string;
   expectedRole?: string;
+  expectedRoles?: string[];
 }
 
 function safeString(value: unknown): string {
@@ -21,6 +22,7 @@ function safeString(value: unknown): string {
 
 function mapLegacyAdminRole(role: string): UserRole | null {
   if (role === "admin") return "admin";
+  if (role === "staff") return "admin";
   if (role === "editor") return "editor";
   return null;
 }
@@ -32,13 +34,23 @@ export async function POST(req: Request) {
     const email = safeString(body.email).toLowerCase();
     const password = safeString(body.password);
     const expectedRole = normalizeRole(body.expectedRole);
+    const expectedRoles = Array.isArray(body.expectedRoles)
+      ? body.expectedRoles
+          .map((role) => normalizeRole(role))
+          .filter((role): role is NonNullable<ReturnType<typeof normalizeRole>> => Boolean(role))
+      : [];
+    const acceptedRoles = expectedRole
+      ? [expectedRole]
+      : expectedRoles.length > 0
+        ? expectedRoles
+        : [];
 
     safeLog(
       "auth.supabase.password.login.requested",
       {
         requestId,
         route: "/api/auth/supabase/password/login",
-        hasExpectedRole: Boolean(expectedRole),
+        hasExpectedRole: acceptedRoles.length > 0,
       },
       req
     );
@@ -64,7 +76,7 @@ export async function POST(req: Request) {
     });
 
     const resolvedRole = profile?.role || "customer";
-    if (expectedRole && resolvedRole !== expectedRole) {
+    if (acceptedRoles.length > 0 && !acceptedRoles.includes(resolvedRole)) {
       return apiError(req, 403, "role_not_allowed", "This account is not allowed for this portal.");
     }
 

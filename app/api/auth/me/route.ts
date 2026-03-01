@@ -11,11 +11,11 @@ export async function GET(req: Request) {
   if (supabaseSession) {
     const profile = await getIdentityProfileByUserId(supabaseSession.userId);
     const role = profile?.role || supabaseSession.role || "customer";
-    if (role === "admin") {
+    if (role === "admin" || role === "staff") {
       return NextResponse.json({
         user: {
           username: supabaseSession.email || supabaseSession.userId,
-          role: "admin",
+          role,
           authProvider: "supabase",
         },
       });

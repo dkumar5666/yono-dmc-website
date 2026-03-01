@@ -46,6 +46,8 @@ export default function Header() {
   const isHome = pathname === "/";
   const [homeScrolled, setHomeScrolled] = useState(false);
   const HEADER_HEIGHT = 74;
+  const [customerName, setCustomerName] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedCurrency, setSelectedCurrency] = useState(() => {
     if (typeof window === "undefined") return currencies[0];
     try {
@@ -86,7 +88,37 @@ export default function Header() {
     };
   }, [isHome]);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch("/api/customer-auth/me", { cache: "no-store" });
+        if (!response.ok) {
+          if (active) setCustomerName(null);
+          return;
+        }
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { user?: { name?: string } };
+        };
+        const fullName = payload?.data?.user?.name?.trim() || "";
+        if (!active) return;
+        setCustomerName(fullName ? fullName.split(/\s+/)[0] : "Account");
+      } catch {
+        if (active) setCustomerName(null);
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const showCategoryNav = !isHome || homeScrolled;
+  const accountLabel = customerName || "Sign in";
+  const accountHref = customerName ? "/my-trips" : "/login";
+  const mobileAccountLabel = customerName ? accountLabel : "Login";
+  const mobileAccountHref = customerName ? "/my-trips" : "/login";
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -161,8 +193,8 @@ export default function Header() {
             <Link href="/trips" className="hover:text-slate-900">
               My Trips
             </Link>
-            <Link href="/login" className="hover:text-slate-900">
-              Sign in
+            <Link href={accountHref} className="hover:text-slate-900">
+              {authLoading ? "..." : accountLabel}
             </Link>
 
             <div className="relative group">
@@ -192,10 +224,10 @@ export default function Header() {
           </div>
           <div className="flex items-center gap-2 lg:hidden">
             <Link
-              href="/login"
+              href={mobileAccountHref}
               className="inline-flex rounded-full bg-[#199ce0] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
-              Login
+              {authLoading ? "..." : mobileAccountLabel}
             </Link>
             <a
               href="https://wa.me/919958839319"

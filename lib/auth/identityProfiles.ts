@@ -4,7 +4,7 @@ import { SupabaseNotConfiguredError, SupabaseRestClient, getSupabaseConfig } fro
 import { IdentityRole, normalizeRole } from "@/lib/auth/supabaseSession";
 
 type GenericRow = Record<string, unknown>;
-const SELF_SIGNUP_ROLES = new Set<IdentityRole>(["customer", "agent"]);
+const SELF_SIGNUP_ROLES = new Set<IdentityRole>(["customer", "agent", "supplier"]);
 
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

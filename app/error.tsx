@@ -1,43 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
 
-export default function Error({
+export default function GlobalError({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error("APP ERROR:", error);
-  }, [error]);
-
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-xl bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
-        <h2 className="text-3xl font-bold text-slate-900 mb-3">Something went wrong</h2>
-        <p className="text-gray-600 mb-6">
-          We could not load this page right now. Please retry.
-        </p>
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={reset}
-            className="px-5 py-2.5 rounded-lg bg-[#199ce0] text-white font-semibold"
-          >
-            Retry
-          </button>
-          <Link
-            href="/"
-            className="px-5 py-2.5 rounded-lg border border-gray-300 text-slate-700 font-semibold"
-          >
-            Go Home
-          </Link>
-        </div>
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-3xl flex-col items-center justify-center px-4 py-12 text-center">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#199ce0]">Yono DMC</p>
+      <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Something went wrong</h1>
+      <p className="mt-3 max-w-xl text-sm text-slate-600 sm:text-base">
+        We could not load this page right now. Please retry. If the issue continues, contact support.
+      </p>
+      {error?.digest ? (
+        <p className="mt-2 text-xs text-slate-400">Reference: {error.digest}</p>
+      ) : null}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          className="inline-flex items-center justify-center rounded-xl bg-[#199ce0] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#148bc7]"
+        >
+          Try Again
+        </button>
+        <Link
+          href="/support"
+          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-300"
+        >
+          Contact Support
+        </Link>
       </div>
-    </div>
+    </main>
   );
 }
-

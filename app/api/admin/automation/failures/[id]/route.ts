@@ -83,14 +83,14 @@ function normalizeFailure(row: GenericRow | null) {
 async function resolveFailure(db: SupabaseRestClient, id: string): Promise<GenericRow | null> {
   const candidates: Array<{ table: string; selects: string[] }> = [
     {
-      table: "event_failures",
+      table: "automation_failures",
       selects: [
         "id,booking_id,event,status,attempts,last_error,created_at,updated_at,payload,meta,stack",
         "*",
       ],
     },
     {
-      table: "automation_failures",
+      table: "event_failures",
       selects: [
         "id,booking_id,event,status,attempts,last_error,created_at,updated_at,payload,meta,stack",
         "*",
@@ -145,4 +145,3 @@ export async function GET(
     return routeError(500, "Failed to load automation failure details");
   }
 }
-

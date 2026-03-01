@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/middleware/requireRole";
-import { SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
+import { getSupabaseConfig, SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
 import { routeError } from "@/lib/middleware/routeError";
+import { getAmadeusConfig } from "@/lib/config/amadeus";
 
 interface SystemHealthResponse {
   lastCronRetryAt: string | null;
@@ -11,6 +12,12 @@ interface SystemHealthResponse {
   missingDocuments: number;
   webhookEvents24h: number;
   webhookSkipped24h: number;
+  integrationStatus: {
+    cronRetry: "ok" | "stale" | "unknown";
+    paymentWebhook: "ok" | "stale" | "unknown";
+    amadeus: "ok" | "failed" | "skipped";
+    storage: "ok" | "failed" | "skipped";
+  };
 }
 
 interface GenericRow {
@@ -36,10 +43,29 @@ const EMPTY_RESPONSE: SystemHealthResponse = {
   missingDocuments: 0,
   webhookEvents24h: 0,
   webhookSkipped24h: 0,
+  integrationStatus: {
+    cronRetry: "unknown",
+    paymentWebhook: "unknown",
+    amadeus: "skipped",
+    storage: "skipped",
+  },
 };
 
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isStale(value: string | null, minutes: number): boolean | null {
+  if (!value) return null;
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) return null;
+  return Date.now() - ts > minutes * 60 * 1000;
+}
+
+function mapFreshness(value: string | null, staleMinutes: number): "ok" | "stale" | "unknown" {
+  const stale = isStale(value, staleMinutes);
+  if (stale === null) return "unknown";
+  return stale ? "stale" : "ok";
 }
 
 async function safeSelectMany<T>(db: SupabaseRestClient, table: string, query: URLSearchParams): Promise<T[]> {
@@ -110,21 +136,21 @@ async function getFailures24h(db: SupabaseRestClient): Promise<number> {
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const candidates = [
     {
-      table: "event_failures",
+      table: "automation_failures",
       query: new URLSearchParams({ select: "id", created_at: `gte.${sinceIso}` }),
     },
     {
-      table: "automation_failures",
+      table: "event_failures",
       query: new URLSearchParams({ select: "id", created_at: `gte.${sinceIso}` }),
     },
   ];
 
+  let total = 0;
   for (const candidate of candidates) {
-    const count = await safeCountByQuery(db, candidate.table, candidate.query);
-    if (count > 0) return count;
+    total += await safeCountByQuery(db, candidate.table, candidate.query);
   }
 
-  return 0;
+  return total;
 }
 
 async function getPendingSupport(db: SupabaseRestClient): Promise<number> {
@@ -216,6 +242,67 @@ async function getWebhookEventStats24h(
   return { webhookEvents24h: allCount, webhookSkipped24h: skippedCount };
 }
 
+async function testAmadeusTokenPing(): Promise<"ok" | "failed" | "skipped"> {
+  let config: ReturnType<typeof getAmadeusConfig> | null = null;
+  try {
+    config = getAmadeusConfig();
+  } catch {
+    return "skipped";
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6_000);
+  try {
+    const tokenRes = await fetch(`${config.baseUrl}/v1/security/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!tokenRes.ok) return "failed";
+    const json = (await tokenRes.json().catch(() => ({}))) as { access_token?: string };
+    return json.access_token ? "ok" : "failed";
+  } catch {
+    return "failed";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function testStorageAccess(): Promise<"ok" | "failed" | "skipped"> {
+  const config = getSupabaseConfig();
+  if (!config) return "skipped";
+
+  const bucket = (process.env.DOCUMENTS_STORAGE_BUCKET || "documents").trim();
+  if (!bucket) return "skipped";
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`${config.url}/storage/v1/object/list/${bucket}`, {
+      method: "POST",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ limit: 1 }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    return response.ok ? "ok" : "failed";
+  } catch {
+    return "failed";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function GET(req: Request) {
   const auth = requireRole(req, "admin");
   if (auth.denied) return auth.denied;
@@ -229,6 +316,8 @@ export async function GET(req: Request) {
       pendingSupport,
       missingDocuments,
       webhookStats,
+      amadeusStatus,
+      storageStatus,
     ] =
       await Promise.all([
         getLatestHeartbeat(db, "cron_retry"),
@@ -237,6 +326,8 @@ export async function GET(req: Request) {
         getPendingSupport(db),
         getMissingDocumentsCount(db),
         getWebhookEventStats24h(db),
+        testAmadeusTokenPing(),
+        testStorageAccess(),
       ]);
 
     return NextResponse.json<SystemHealthResponse>({
@@ -247,6 +338,12 @@ export async function GET(req: Request) {
       missingDocuments,
       webhookEvents24h: webhookStats.webhookEvents24h,
       webhookSkipped24h: webhookStats.webhookSkipped24h,
+      integrationStatus: {
+        cronRetry: mapFreshness(lastCronRetryAt, 15),
+        paymentWebhook: mapFreshness(lastPaymentWebhookAt, 60),
+        amadeus: amadeusStatus,
+        storage: storageStatus,
+      },
     });
   } catch (error) {
     if (error instanceof SupabaseNotConfiguredError) {

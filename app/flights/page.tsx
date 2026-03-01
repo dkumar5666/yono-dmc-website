@@ -78,6 +78,12 @@ function parseDurationToMinutes(value: string): number {
   return hours * 60 + minutes;
 }
 
+function toObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function formatDuration(value: string): string {
   const totalMinutes = parseDurationToMinutes(value);
   if (!Number.isFinite(totalMinutes) || totalMinutes === Number.MAX_SAFE_INTEGER) {
@@ -157,9 +163,10 @@ function FlightsPageContent() {
   const [providerPaymentId, setProviderPaymentId] = useState("");
   const [supplierBookingResult, setSupplierBookingResult] =
     useState<SupplierFlightBookingResult | null>(null);
+  const [priceNotice, setPriceNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyStep, setBusyStep] = useState<
-    "search" | "book" | "intent" | "confirm" | "supplier" | null
+    "search" | "price" | "book" | "intent" | "confirm" | "supplier" | null
   >(null);
 
   const canCreateBooking = useMemo(() => {
@@ -322,6 +329,49 @@ function FlightsPageContent() {
       setBooking(data.booking);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Booking creation failed";
+      setError(message);
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  async function handleVerifyPrice() {
+    if (!selectedOffer) return;
+    setError(null);
+    setPriceNotice(null);
+    setBusyStep("price");
+    try {
+      const response = await fetch("/api/flights/price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          offer_id: selectedOffer.id,
+          raw_offer:
+            toObject(selectedOffer.raw) ||
+            toObject((selectedOffer as unknown as Record<string, unknown>).raw_offer) ||
+            null,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        priced_offer?: FlightOfferSummary;
+      };
+      if (!response.ok || !payload.ok || !payload.priced_offer) {
+        throw new Error(payload.error || "Price verification failed");
+      }
+
+      const nextOffer = payload.priced_offer;
+      setSelectedOffer(nextOffer);
+      setOffers((prev) =>
+        prev.map((offer) => (offer.id === selectedOffer.id ? nextOffer : offer))
+      );
+      setPriceNotice(
+        `Latest price verified: ${nextOffer.currency} ${nextOffer.totalPrice.toLocaleString("en-IN")}`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Price verification failed";
       setError(message);
     } finally {
       setBusyStep(null);
@@ -638,10 +688,31 @@ function FlightsPageContent() {
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-slate-900">Available Offers</h2>
-                <p className="text-sm text-slate-600">
-                  {filteredOffers.length} result{filteredOffers.length === 1 ? "" : "s"}
-                </p>
+                <div className="flex items-center gap-2">
+                  {selectedOffer ? (
+                    <button
+                      type="button"
+                      onClick={handleVerifyPrice}
+                      disabled={busyStep !== null}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 disabled:opacity-60"
+                    >
+                      {busyStep === "price" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      Verify price
+                    </button>
+                  ) : null}
+                  <p className="text-sm text-slate-600">
+                    {filteredOffers.length} result{filteredOffers.length === 1 ? "" : "s"}
+                  </p>
+                </div>
               </div>
+
+              {priceNotice ? (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {priceNotice}
+                </div>
+              ) : null}
 
               {offers.length === 0 ? (
                 <div className="mt-3 bg-blue-50 p-3 rounded-lg flex gap-2">

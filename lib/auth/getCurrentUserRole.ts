@@ -22,7 +22,13 @@ export interface CurrentUserRoleContext {
 }
 
 function normalizeRole(value: unknown): IdentityRole | null {
-  if (value === "admin" || value === "customer" || value === "agent" || value === "supplier") {
+  if (
+    value === "admin" ||
+    value === "staff" ||
+    value === "customer" ||
+    value === "agent" ||
+    value === "supplier"
+  ) {
     return value;
   }
   return null;

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-export type AuthRole = "admin" | "customer" | "supplier" | "agent";
+export type AuthRole = "admin" | "staff" | "customer" | "supplier" | "agent";
 
 export interface JwtRoleContext {
   token: string;
@@ -41,19 +41,37 @@ function verifyHs256(token: string, secret: string): boolean {
 
 function extractRole(claims: Record<string, unknown>): AuthRole | null {
   const direct = claims.role;
-  if (direct === "admin" || direct === "customer" || direct === "supplier" || direct === "agent") {
+  if (
+    direct === "admin" ||
+    direct === "staff" ||
+    direct === "customer" ||
+    direct === "supplier" ||
+    direct === "agent"
+  ) {
     return direct;
   }
 
   const userRole = claims.user_role;
-  if (userRole === "admin" || userRole === "customer" || userRole === "supplier" || userRole === "agent") {
+  if (
+    userRole === "admin" ||
+    userRole === "staff" ||
+    userRole === "customer" ||
+    userRole === "supplier" ||
+    userRole === "agent"
+  ) {
     return userRole;
   }
 
   const appMetadata = claims.app_metadata;
   if (appMetadata && typeof appMetadata === "object") {
     const role = (appMetadata as Record<string, unknown>).role;
-    if (role === "admin" || role === "customer" || role === "supplier" || role === "agent") {
+    if (
+      role === "admin" ||
+      role === "staff" ||
+      role === "customer" ||
+      role === "supplier" ||
+      role === "agent"
+    ) {
       return role;
     }
   }

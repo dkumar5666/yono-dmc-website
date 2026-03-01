@@ -69,8 +69,12 @@ interface DocumentRow {
   id?: string | null;
   booking_id?: string | null;
   type?: string | null;
+  status?: string | null;
+  url?: string | null;
+  file_url?: string | null;
   public_url?: string | null;
   storage_path?: string | null;
+  file_path?: string | null;
   created_at?: string | null;
   metadata?: unknown;
 }
@@ -175,6 +179,39 @@ function deriveDocumentName(row: DocumentRow): string {
 
   const type = safeString(row.type) || "document";
   return `${type} document`;
+}
+
+function deriveItemTitle(meta: Record<string, unknown> | null, fallbackTitle: string | null): string | null {
+  const direct =
+    safeString(meta?.title) ||
+    safeString(meta?.name) ||
+    fallbackTitle;
+  if (direct) return direct;
+
+  const segments = Array.isArray(meta?.segments) ? meta?.segments : [];
+  if (segments.length > 0) {
+    const first = segments[0] && typeof segments[0] === "object" ? (segments[0] as Record<string, unknown>) : null;
+    const lastRaw = segments[segments.length - 1];
+    const last = lastRaw && typeof lastRaw === "object" ? (lastRaw as Record<string, unknown>) : null;
+    const from = safeString(first?.from);
+    const to = safeString(last?.to);
+    if (from && to) return `Flight ${from}-${to}`;
+  }
+
+  return null;
+}
+
+function deriveSupplierName(
+  mapValue: string | null,
+  meta: Record<string, unknown> | null
+): string | null {
+  return (
+    safeString(mapValue) ||
+    safeString(meta?.supplier_name) ||
+    safeString(meta?.supplier) ||
+    safeString(meta?.airline) ||
+    null
+  );
 }
 
 function normalizeSupplierLogRow(row: GenericRow) {
@@ -357,6 +394,7 @@ export async function GET(
       type?: string | null;
       name?: string | null;
       url?: string | null;
+      status?: string | null;
       created_at?: string | null;
     }> = [];
     let supplier_logs: Array<{
@@ -433,19 +471,35 @@ export async function GET(
 
       items = itemRows.map((row) => {
         const meta = toJsonObject(row.metadata);
-        const title =
-          safeString(meta?.title) ||
-          safeString(meta?.name) ||
-          safeString(productMap.get(row.product_id ?? "")) ||
-          safeString(row.external_item_id) ||
-          null;
+        const productTitle = safeString(productMap.get(row.product_id ?? "")) || null;
+        const title = deriveItemTitle(
+          meta,
+          productTitle || safeString(row.external_item_id) || null
+        );
+        const segments = Array.isArray(meta?.segments) ? meta.segments : [];
+        const firstSegment =
+          segments[0] && typeof segments[0] === "object"
+            ? (segments[0] as Record<string, unknown>)
+            : null;
+        const lastSegmentRaw = segments.length > 0 ? segments[segments.length - 1] : null;
+        const lastSegment =
+          lastSegmentRaw && typeof lastSegmentRaw === "object"
+            ? (lastSegmentRaw as Record<string, unknown>)
+            : null;
+        const startDate =
+          (row.service_start_at ?? safeString(firstSegment?.departure_at)) || null;
+        const endDate =
+          (row.service_end_at ?? safeString(lastSegment?.arrival_at)) || null;
         return {
           id: row.id ?? null,
           type: safeString(row.item_type) || null,
           title,
-          supplier_name: safeString(supplierMap.get(row.supplier_id ?? "")) || null,
-          start_date: row.service_start_at ?? null,
-          end_date: row.service_end_at ?? null,
+          supplier_name: deriveSupplierName(
+            safeString(supplierMap.get(row.supplier_id ?? "")) || null,
+            meta
+          ),
+          start_date: startDate,
+          end_date: endDate,
           qty: toNumber(row.quantity),
           amount: toNumber(row.total_amount),
           currency: safeString(row.currency_code) || null,
@@ -479,7 +533,7 @@ export async function GET(
         db,
         "documents",
         new URLSearchParams({
-          select: "id,booking_id,type,public_url,storage_path,created_at,metadata",
+          select: "id,booking_id,type,status,url,file_url,public_url,storage_path,file_path,created_at,metadata",
           booking_id: `eq.${bookingUuid}`,
           order: "created_at.desc",
           limit: "20",
@@ -490,7 +544,8 @@ export async function GET(
         booking_id: row.booking_id ?? null,
         type: safeString(row.type) || null,
         name: deriveDocumentName(row),
-        url: safeString(row.public_url) || null,
+        url: safeString(row.public_url) || safeString(row.url) || safeString(row.file_url) || null,
+        status: safeString(row.status) || null,
         created_at: row.created_at ?? null,
       }));
 
@@ -578,4 +633,3 @@ export async function GET(
     return routeError(500, "Failed to load booking details");
   }
 }
-

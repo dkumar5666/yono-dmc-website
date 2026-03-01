@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { holidays } from "@/data/holidays";
 
 interface Props {
@@ -13,6 +14,35 @@ function toSlug(value: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(" ");
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const resolvedParams = "then" in params ? await params : params;
+  const destinationSlug = resolvedParams.slug;
+  const filtered = holidays.filter((item) => toSlug(item.country) === destinationSlug);
+  const destinationName = filtered[0]?.country || titleFromSlug(destinationSlug);
+
+  return {
+    title: `${destinationName} Packages | Yono DMC`,
+    description: `Explore ${destinationName} holiday packages, inclusions, and itineraries with Yono DMC.`,
+    alternates: {
+      canonical: `/destinations/${destinationSlug}`,
+    },
+    openGraph: {
+      title: `${destinationName} Packages | Yono DMC`,
+      description: `Compare curated ${destinationName} travel packages and plan your trip with Yono DMC.`,
+      url: `/destinations/${destinationSlug}`,
+      type: "website",
+    },
+  };
 }
 
 export default async function DestinationPackagesPage({ params }: Props) {

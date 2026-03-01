@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCustomerPortalSession, listCustomerTrips } from "@/lib/backend/customerTripsPortal";
+import { requirePortalRole } from "@/lib/auth/requirePortalRole";
+import { getCustomerProfileCompletionStatus } from "@/lib/backend/customerAccount";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +39,25 @@ function StatusBadge({ label }: { label?: string | null }) {
 }
 
 export default async function MyTripsPage() {
+  await requirePortalRole("customer", {
+    loginPath: "/login",
+    nextPath: "/my-trips",
+  });
+
   const cookieStore = await cookies();
   const session = await getCustomerPortalSession(cookieStore);
 
   if (!session) {
     redirect("/login?next=%2Fmy-trips");
+  }
+  if (session.provider === "supabase" && !session.phone) {
+    redirect("/login?next=%2Fmy-trips&require_mobile_otp=1");
+  }
+  if (session.provider === "supabase") {
+    const profileCompleted = await getCustomerProfileCompletionStatus(session.id);
+    if (!profileCompleted) {
+      redirect("/account/onboarding");
+    }
   }
 
   const bookings = await listCustomerTrips(session);
@@ -121,4 +137,3 @@ export default async function MyTripsPage() {
     </section>
   );
 }
-

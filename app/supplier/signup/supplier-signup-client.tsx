@@ -18,13 +18,6 @@ interface ApiErrorPayload {
   };
 }
 
-interface StartResponse {
-  request_id?: string;
-  deduped?: boolean;
-  email_verified?: boolean;
-  phone_verified?: boolean;
-}
-
 interface UploadResponse {
   file?: {
     path?: string;
@@ -155,11 +148,9 @@ function TextInput(props: {
   placeholder?: string;
   type?: string;
   required?: boolean;
-  className?: string;
-  disabled?: boolean;
 }) {
   return (
-    <div className={props.className}>
+    <div>
       <label className="mb-1.5 block text-sm font-medium text-slate-700">
         {props.label}
         {props.required ? " *" : ""}
@@ -169,8 +160,7 @@ function TextInput(props: {
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
         placeholder={props.placeholder}
-        disabled={props.disabled}
-        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:bg-slate-100"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
       />
     </div>
   );
@@ -182,6 +172,7 @@ export default function SupplierSignupClient() {
 
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+
   const [requestId, setRequestId] = useState("");
   const [requestDeduped, setRequestDeduped] = useState(false);
 
@@ -209,37 +200,26 @@ export default function SupplierSignupClient() {
     setDetails((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function ensureRequestCreated(): Promise<string> {
-    if (requestId) return requestId;
-
-    const localError = validateStepOne(contactEmail, contactPhone);
-    if (localError) throw new Error(localError);
-
-    const result = await postJson<StartResponse>("/api/supplier/signup/start", {
-      contact_email: contactEmail.trim().toLowerCase(),
-      contact_phone: normalizePhone(contactPhone),
-    });
-    if (!result.ok || !result.data?.request_id) {
-      throw new Error(result.error || "Failed to start supplier signup.");
-    }
-
-    setRequestId(result.data.request_id);
-    setRequestDeduped(Boolean(result.data.deduped));
-    setEmailVerified(Boolean(result.data.email_verified));
-    setPhoneVerified(Boolean(result.data.phone_verified));
-    return result.data.request_id;
-  }
-
   async function onSendEmailOtp() {
     if (loading) return;
     setError(null);
     setMessage(null);
+    setRequestId("");
+    setRequestDeduped(false);
+    const localError = validateStepOne(contactEmail, contactPhone);
+    if (localError) {
+      setError(localError);
+      return;
+    }
+
     setLoading(true);
     try {
-      const currentRequestId = await ensureRequestCreated();
       const result = await postJson<{ sent?: boolean; verified?: boolean }>(
         "/api/supplier/signup/otp/email/send",
-        { request_id: currentRequestId }
+        {
+          email: contactEmail.trim().toLowerCase(),
+          phone: normalizePhone(contactPhone),
+        }
       );
       if (!result.ok) throw new Error(result.error || "Failed to send email OTP.");
       if (result.data?.verified) {
@@ -257,13 +237,14 @@ export default function SupplierSignupClient() {
   }
 
   async function onVerifyEmailOtp() {
-    if (!requestId || !emailOtp.trim() || loading) return;
+    if (!emailOtp.trim() || loading) return;
     setError(null);
     setMessage(null);
     setLoading(true);
     try {
       const result = await postJson<{ verified?: boolean }>("/api/supplier/signup/otp/email/verify", {
-        request_id: requestId,
+        email: contactEmail.trim().toLowerCase(),
+        phone: normalizePhone(contactPhone),
         otp: emailOtp.trim(),
       });
       if (!result.ok) throw new Error(result.error || "Failed to verify email OTP.");
@@ -280,12 +261,22 @@ export default function SupplierSignupClient() {
     if (loading) return;
     setError(null);
     setMessage(null);
+    setRequestId("");
+    setRequestDeduped(false);
+    const localError = validateStepOne(contactEmail, contactPhone);
+    if (localError) {
+      setError(localError);
+      return;
+    }
+
     setLoading(true);
     try {
-      const currentRequestId = await ensureRequestCreated();
       const result = await postJson<{ sent?: boolean; verified?: boolean }>(
         "/api/supplier/signup/otp/phone/send",
-        { request_id: currentRequestId }
+        {
+          email: contactEmail.trim().toLowerCase(),
+          phone: normalizePhone(contactPhone),
+        }
       );
       if (!result.ok) throw new Error(result.error || "Failed to send mobile OTP.");
       if (result.data?.verified) {
@@ -303,13 +294,14 @@ export default function SupplierSignupClient() {
   }
 
   async function onVerifyPhoneOtp() {
-    if (!requestId || !phoneOtp.trim() || loading) return;
+    if (!phoneOtp.trim() || loading) return;
     setError(null);
     setMessage(null);
     setLoading(true);
     try {
       const result = await postJson<{ verified?: boolean }>("/api/supplier/signup/otp/phone/verify", {
-        request_id: requestId,
+        email: contactEmail.trim().toLowerCase(),
+        phone: normalizePhone(contactPhone),
         otp: phoneOtp.trim(),
       });
       if (!result.ok) throw new Error(result.error || "Failed to verify mobile OTP.");
@@ -325,10 +317,6 @@ export default function SupplierSignupClient() {
   function onContinueToDetails() {
     setError(null);
     setMessage(null);
-    if (!requestId) {
-      setError("Start verification first.");
-      return;
-    }
     if (!emailVerified || !phoneVerified) {
       setError("Complete both email and mobile OTP verification before proceeding.");
       return;
@@ -341,10 +329,6 @@ export default function SupplierSignupClient() {
     setError(null);
     setMessage(null);
 
-    if (!requestId) {
-      setError("Request id missing. Please complete Step 1 again.");
-      return;
-    }
     if (!emailVerified || !phoneVerified) {
       setError("Step 1 verification must be completed first.");
       return;
@@ -358,33 +342,41 @@ export default function SupplierSignupClient() {
 
     setLoading(true);
     try {
-      const result = await postJson<{ details_saved?: boolean }>("/api/supplier/signup/details", {
-        request_id: requestId,
-        business_type: details.business_type,
-        company_legal_name: details.company_legal_name,
-        brand_name: details.brand_name || undefined,
-        address: details.address,
-        city: details.city,
-        pin_code: details.pin_code,
-        country: details.country || "India",
-        website: details.website || undefined,
-        contact_name: details.contact_name,
-        alt_phone: details.alt_phone ? normalizePhone(details.alt_phone) : undefined,
-        support_email: details.support_email ? details.support_email.trim().toLowerCase() : undefined,
-        gstin: details.gstin.trim().toUpperCase(),
-        pan: details.pan.trim().toUpperCase(),
-        cin: details.cin || undefined,
-        iata_code: details.iata_code || undefined,
-        license_no: details.license_no || undefined,
-        bank_meta: {
-          account_name: details.bank_account_name || null,
-          bank_name: details.bank_name || null,
-          account_no: details.bank_account_no || null,
-          ifsc: details.bank_ifsc || null,
-          upi_id: details.bank_upi_id || null,
-        },
-      });
+      const result = await postJson<{ details_saved?: boolean; request_id?: string; deduped?: boolean }>(
+        "/api/supplier/signup/details",
+        {
+          contact_email: contactEmail.trim().toLowerCase(),
+          contact_phone: normalizePhone(contactPhone),
+          business_type: details.business_type,
+          company_legal_name: details.company_legal_name,
+          brand_name: details.brand_name || undefined,
+          address: details.address,
+          city: details.city,
+          pin_code: details.pin_code,
+          country: details.country || "India",
+          website: details.website || undefined,
+          contact_name: details.contact_name,
+          alt_phone: details.alt_phone ? normalizePhone(details.alt_phone) : undefined,
+          support_email: details.support_email ? details.support_email.trim().toLowerCase() : undefined,
+          gstin: details.gstin.trim().toUpperCase(),
+          pan: details.pan.trim().toUpperCase(),
+          cin: details.cin || undefined,
+          iata_code: details.iata_code || undefined,
+          license_no: details.license_no || undefined,
+          bank_meta: {
+            account_name: details.bank_account_name || null,
+            bank_name: details.bank_name || null,
+            account_no: details.bank_account_no || null,
+            ifsc: details.bank_ifsc || null,
+            upi_id: details.bank_upi_id || null,
+          },
+        }
+      );
       if (!result.ok) throw new Error(result.error || "Failed to save supplier details.");
+      if (!result.data?.request_id) throw new Error("Failed to generate request id after verification.");
+
+      setRequestId(result.data.request_id);
+      setRequestDeduped(Boolean(result.data.deduped));
       setStep(3);
       setMessage("Business details saved. Upload documents and submit request.");
     } catch (err) {
@@ -410,7 +402,6 @@ export default function SupplierSignupClient() {
       });
       const body = (await response.json().catch(() => ({}))) as { data?: UploadResponse } & ApiErrorPayload;
       if (!response.ok) throw new Error(readErrorMessage(body, "Failed to upload document."));
-
       const uploaded = body.data?.file;
       const path = uploaded?.path || "";
       if (!path) throw new Error("Upload response missing file path.");
@@ -472,9 +463,8 @@ export default function SupplierSignupClient() {
 
       {step === 1 ? (
         <section className="space-y-4 rounded-2xl border border-slate-200 p-4">
-          <TextInput label="Primary Contact Email" type="email" required value={contactEmail} onChange={setContactEmail} placeholder="contact@company.com" disabled={emailVerified} />
-          <TextInput label="Primary Contact Mobile" required value={contactPhone} onChange={setContactPhone} placeholder="+919876543210" disabled={phoneVerified} />
-
+          <TextInput label="Primary Contact Email" type="email" required value={contactEmail} onChange={setContactEmail} placeholder="contact@company.com" />
+          <TextInput label="Primary Contact Mobile" required value={contactPhone} onChange={setContactPhone} placeholder="+919876543210" />
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-200 p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -493,7 +483,6 @@ export default function SupplierSignupClient() {
                 </div>
               ) : null}
             </div>
-
             <div className="rounded-xl border border-slate-200 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-900">Mobile OTP</p>
@@ -512,7 +501,6 @@ export default function SupplierSignupClient() {
               ) : null}
             </div>
           </div>
-
           <button type="button" onClick={onContinueToDetails} disabled={loading || !emailVerified || !phoneVerified} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Continue to Business Details
@@ -522,11 +510,6 @@ export default function SupplierSignupClient() {
 
       {step === 2 ? (
         <form className="space-y-4" onSubmit={(event) => void onSaveDetails(event)} noValidate>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            Request ID: <span className="font-mono text-slate-800">{requestId}</span>
-            {requestDeduped ? <span className="ml-2 text-amber-700">(existing request resumed)</span> : null}
-          </div>
-
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Business Type *</label>
@@ -536,24 +519,24 @@ export default function SupplierSignupClient() {
                 ))}
               </select>
             </div>
-            <TextInput className="" label="Company Legal Name" required value={details.company_legal_name} onChange={(v) => updateDetail("company_legal_name", v)} placeholder="ABC Travels Private Limited" />
-            <TextInput className="" label="Brand / Trading Name" value={details.brand_name} onChange={(v) => updateDetail("brand_name", v)} placeholder="ABC Holidays" />
+            <TextInput label="Company Legal Name" required value={details.company_legal_name} onChange={(v) => updateDetail("company_legal_name", v)} />
+            <TextInput label="Brand / Trading Name" value={details.brand_name} onChange={(v) => updateDetail("brand_name", v)} />
             <div className="sm:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">Registered Address *</label>
               <textarea value={details.address} onChange={(event) => updateDetail("address", event.target.value)} rows={3} className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" />
             </div>
             <TextInput label="City" required value={details.city} onChange={(v) => updateDetail("city", v)} />
-            <TextInput label="PIN Code" required value={details.pin_code} onChange={(v) => updateDetail("pin_code", v)} placeholder="400001" />
+            <TextInput label="PIN Code" required value={details.pin_code} onChange={(v) => updateDetail("pin_code", v)} />
             <TextInput label="Country" required value={details.country} onChange={(v) => updateDetail("country", v)} />
-            <TextInput label="Website URL" value={details.website} onChange={(v) => updateDetail("website", v)} placeholder="https://example.com" />
+            <TextInput label="Website URL" value={details.website} onChange={(v) => updateDetail("website", v)} />
             <TextInput label="Primary Contact Name" required value={details.contact_name} onChange={(v) => updateDetail("contact_name", v)} />
-            <TextInput label="Alternate Phone" value={details.alt_phone} onChange={(v) => updateDetail("alt_phone", v)} placeholder="+911234567890" />
+            <TextInput label="Alternate Phone" value={details.alt_phone} onChange={(v) => updateDetail("alt_phone", v)} />
             <TextInput label="Support Email" type="email" value={details.support_email} onChange={(v) => updateDetail("support_email", v)} />
             <TextInput label="GSTIN" required value={details.gstin} onChange={(v) => updateDetail("gstin", v.toUpperCase())} />
             <TextInput label="PAN" required value={details.pan} onChange={(v) => updateDetail("pan", v.toUpperCase())} />
             <TextInput label="CIN" value={details.cin} onChange={(v) => updateDetail("cin", v)} />
             <TextInput label="IATA / TIDS" value={details.iata_code} onChange={(v) => updateDetail("iata_code", v)} />
-            <TextInput className="sm:col-span-2" label="Tourism / Trade License No." value={details.license_no} onChange={(v) => updateDetail("license_no", v)} />
+            <TextInput label="Tourism / Trade License No." value={details.license_no} onChange={(v) => updateDetail("license_no", v)} />
 
             <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Bank Details (Optional at request stage)</p>
@@ -562,11 +545,10 @@ export default function SupplierSignupClient() {
                 <TextInput label="Bank name" value={details.bank_name} onChange={(v) => updateDetail("bank_name", v)} />
                 <TextInput label="Account no. (masked if needed)" value={details.bank_account_no} onChange={(v) => updateDetail("bank_account_no", v)} />
                 <TextInput label="IFSC" value={details.bank_ifsc} onChange={(v) => updateDetail("bank_ifsc", v)} />
-                <TextInput className="sm:col-span-2" label="UPI ID" value={details.bank_upi_id} onChange={(v) => updateDetail("bank_upi_id", v)} />
+                <TextInput label="UPI ID" value={details.bank_upi_id} onChange={(v) => updateDetail("bank_upi_id", v)} />
               </div>
             </div>
           </div>
-
           <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Continue to Documents
@@ -578,6 +560,7 @@ export default function SupplierSignupClient() {
         <form className="space-y-5" onSubmit={(event) => void onSubmitRequest(event)}>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
             Request ID: <span className="font-mono text-slate-800">{requestId}</span>
+            {requestDeduped ? <span className="ml-2 text-amber-700">(existing request resumed)</span> : null}
           </div>
           <section className="space-y-3 rounded-2xl border border-slate-200 p-4">
             <h3 className="text-sm font-semibold text-slate-900">Step 3: Documents Upload</h3>
@@ -586,10 +569,7 @@ export default function SupplierSignupClient() {
               {DOC_CONFIG.map((doc) => (
                 <div key={doc.key} className="rounded-xl border border-slate-200 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-900">
-                      {doc.label}
-                      {doc.required ? " *" : ""}
-                    </p>
+                    <p className="text-sm font-medium text-slate-900">{doc.label}{doc.required ? " *" : ""}</p>
                     {uploadedDocs[doc.key]?.path ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -597,26 +577,15 @@ export default function SupplierSignupClient() {
                       </span>
                     ) : null}
                   </div>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={(event) => {
-                      const next = event.target.files?.[0] || null;
-                      void onUploadDoc(doc.key, next);
-                    }}
-                    disabled={Boolean(uploading[doc.key])}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-sky-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-sky-700"
-                  />
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(event) => { const next = event.target.files?.[0] || null; void onUploadDoc(doc.key, next); }} disabled={Boolean(uploading[doc.key])} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-sky-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-sky-700" />
                 </div>
               ))}
             </div>
           </section>
-
           <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
             <input type="checkbox" checked={declarationAccepted} onChange={(event) => setDeclarationAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
             <span>I confirm the information is correct and I agree to verification and compliance checks.</span>
           </label>
-
           <button type="submit" disabled={loading || submitSuccess || !declarationAccepted || !requiredDocsUploaded} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
             {submitSuccess ? "Submitted" : "Submit Request"}
@@ -626,7 +595,7 @@ export default function SupplierSignupClient() {
 
       {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
       {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div> : null}
-      {requestId ? (
+      {step === 3 && requestId ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
           Keep this request ID for reference: <span className="font-mono">{requestId}</span>
         </div>
@@ -641,4 +610,3 @@ export default function SupplierSignupClient() {
     </div>
   );
 }
-

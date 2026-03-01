@@ -57,6 +57,7 @@ interface DocumentDetail {
   type?: string | null;
   name?: string | null;
   url?: string | null;
+  status?: string | null;
   created_at?: string | null;
 }
 
@@ -114,6 +115,12 @@ function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function toObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function formatDateTime(value?: string | null): string {
   if (!value) return "Not available";
   const date = new Date(value);
@@ -164,6 +171,51 @@ function JsonPreview({ value }: { value: unknown }) {
   );
 }
 
+function extractPaymentLink(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  const candidates = [payload.payment_link_url, payload.payment_url, payload.short_url];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  return null;
+}
+
+function extractPaymentRef(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, unknown>;
+  const candidates = [payload.payment_link_id, payload.provider_order_id, payload.payment_reference];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  return null;
+}
+
+function summarizeFlightMeta(meta: unknown): string | null {
+  const row = toObject(meta);
+  if (!row) return null;
+  const segments = Array.isArray(row.segments) ? row.segments : [];
+  if (segments.length === 0) return null;
+
+  const firstRaw = segments[0];
+  const lastRaw = segments[segments.length - 1];
+  const first = toObject(firstRaw);
+  const last = toObject(lastRaw);
+  const from = safeString(first?.from);
+  const to = safeString(last?.to);
+  const airline =
+    safeString(row.airline) ||
+    safeString(first?.carrier) ||
+    null;
+  const duration = safeString(row.duration) || null;
+
+  const parts: string[] = [];
+  if (from && to) parts.push(`${from} -> ${to}`);
+  if (airline) parts.push(airline);
+  if (duration) parts.push(duration);
+  return parts.length ? parts.join(" | ") : null;
+}
+
 export default function AdminBookingDetailPage() {
   const params = useParams<{ booking_id?: string }>();
   const rawBookingId = typeof params?.booking_id === "string" ? params.booking_id : "";
@@ -177,14 +229,25 @@ export default function AdminBookingDetailPage() {
   const [expandedSupplierLogs, setExpandedSupplierLogs] = useState<Record<string, boolean>>({});
   const [auditEntries, setAuditEntries] = useState<AdminAuditEntry[]>([]);
   const [actionLoading, setActionLoading] = useState<{
-    resendDocuments: boolean;
+    generateDocuments: boolean;
     resyncSupplier: boolean;
+    createPayment: boolean;
   }>({
-    resendDocuments: false,
+    generateDocuments: false,
     resyncSupplier: false,
+    createPayment: false,
   });
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [paymentLinkState, setPaymentLinkState] = useState<{
+    url: string | null;
+    orderId: string | null;
+    paymentId: string | null;
+  }>({
+    url: null,
+    orderId: null,
+    paymentId: null,
+  });
 
   const loadDetails = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -223,6 +286,20 @@ export default function AdminBookingDetailPage() {
           timeline: Array.isArray(payload.timeline) ? payload.timeline : [],
         });
 
+        const latestPaymentWithLink = (Array.isArray(payload.payments) ? payload.payments : []).find(
+          (payment) => extractPaymentLink(payment.raw) || safeString(payment.id)
+        );
+        if (latestPaymentWithLink) {
+          setPaymentLinkState((prev) => ({
+            url: extractPaymentLink(latestPaymentWithLink.raw) || prev.url,
+            orderId:
+              extractPaymentRef(latestPaymentWithLink.raw) ||
+              safeString(latestPaymentWithLink.id) ||
+              prev.orderId,
+            paymentId: safeString(latestPaymentWithLink.id) || prev.paymentId,
+          }));
+        }
+
         try {
           const auditResponse = await fetch(
             `/api/admin/audit?entity_type=booking&entity_id=${encodeURIComponent(bookingId)}&limit=20`,
@@ -256,13 +333,32 @@ export default function AdminBookingDetailPage() {
 
   const booking = data.booking;
   const pageTitle = booking?.booking_id || bookingId || "Booking";
+  const supplierInvoices = useMemo(
+    () =>
+      data.documents.filter((doc) =>
+        safeString(doc.type).toLowerCase().includes("supplier_invoice")
+      ),
+    [data.documents]
+  );
+  const supplierStatusSummary = useMemo(() => {
+    const preferred = data.supplier_logs.find((log) => {
+      const action = safeString(log.action).toLowerCase();
+      return action.includes("complete") || action.includes("confirm") || action.includes("issue");
+    });
+    return (
+      safeString(preferred?.status) ||
+      safeString(booking?.status) ||
+      safeString(booking?.payment_status) ||
+      null
+    );
+  }, [booking?.payment_status, booking?.status, data.supplier_logs]);
 
   const triggerBookingAction = useCallback(
-    async (action: "resendDocuments" | "resyncSupplier") => {
+    async (action: "generateDocuments" | "resyncSupplier") => {
       if (!bookingId) return;
       const path =
-        action === "resendDocuments"
-          ? `/api/admin/bookings/${encodeURIComponent(bookingId)}/resend-documents`
+        action === "generateDocuments"
+          ? `/api/admin/bookings/${encodeURIComponent(bookingId)}/generate-documents`
           : `/api/admin/bookings/${encodeURIComponent(bookingId)}/resync-supplier`;
 
       setActionLoading((prev) => ({ ...prev, [action]: true }));
@@ -275,13 +371,26 @@ export default function AdminBookingDetailPage() {
           ok?: boolean;
           message?: string;
           error?: string;
+          generated?: string[];
+          skipped?: string[];
+          failed?: Array<{ type?: string; error?: string }>;
         };
 
         if (!response.ok) {
           throw new Error(payload.error || `Action failed (${response.status})`);
         }
 
-        setActionNotice(payload.message || "Action recorded.");
+        if (action === "generateDocuments") {
+          const generatedCount = Array.isArray(payload.generated) ? payload.generated.length : 0;
+          const skippedCount = Array.isArray(payload.skipped) ? payload.skipped.length : 0;
+          const failedCount = Array.isArray(payload.failed) ? payload.failed.length : 0;
+          setActionNotice(
+            payload.message ||
+              `Documents run complete: generated ${generatedCount}, skipped ${skippedCount}, failed ${failedCount}.`
+          );
+        } else {
+          setActionNotice(payload.message || "Action recorded.");
+        }
         await loadDetails({ silent: true });
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Action failed");
@@ -291,6 +400,58 @@ export default function AdminBookingDetailPage() {
     },
     [bookingId, loadDetails]
   );
+
+  const createPaymentLink = useCallback(async () => {
+    if (!bookingId) return;
+
+    setActionLoading((prev) => ({ ...prev, createPayment: true }));
+    setActionNotice(null);
+    setActionError(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/bookings/${encodeURIComponent(bookingId)}/create-payment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        payment_id?: string | null;
+        razorpay_order_id?: string | null;
+        payment_url?: string | null;
+        deduped?: boolean;
+        warning?: string | null;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || `Failed to create payment link (${response.status})`);
+      }
+
+      setPaymentLinkState({
+        url: safeString(payload.payment_url) || null,
+        orderId: safeString(payload.razorpay_order_id) || null,
+        paymentId: safeString(payload.payment_id) || null,
+      });
+
+      if (payload.warning) {
+        setActionNotice(payload.warning);
+      } else if (payload.deduped) {
+        setActionNotice("Using existing active payment link for this booking.");
+      } else {
+        setActionNotice("Payment link created.");
+      }
+
+      await loadDetails({ silent: true });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to create payment link");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, createPayment: false }));
+    }
+  }, [bookingId, loadDetails]);
 
   return (
     <div className="space-y-6">
@@ -347,7 +508,7 @@ export default function AdminBookingDetailPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {loading ? (
           <>
             <SkeletonBlock rows={1} />
@@ -379,6 +540,15 @@ export default function AdminBookingDetailPage() {
               <p className="text-sm font-medium text-slate-500">Customer Contact</p>
               <p className="mt-2 text-sm text-slate-900">{safeString(booking?.customer_email) || "Not available"}</p>
               <p className="mt-1 text-sm text-slate-600">{safeString(booking?.customer_phone) || "Not available"}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">Supplier Status</p>
+              <div className="mt-2">
+                <StatusBadge label={supplierStatusSummary || "pending"} />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Supplier logs: {data.supplier_logs.length} | Invoices: {supplierInvoices.length}
+              </p>
             </div>
           </>
         )}
@@ -412,7 +582,14 @@ export default function AdminBookingDetailPage() {
                 {data.items.map((item, index) => (
                   <tr key={`${item.id ?? "item"}-${index}`} className="border-b border-slate-100">
                     <td className="px-3 py-3 text-slate-700">{safeString(item.type) || "-"}</td>
-                    <td className="px-3 py-3 font-medium text-slate-900">{safeString(item.title) || "-"}</td>
+                    <td className="px-3 py-3">
+                      <p className="font-medium text-slate-900">{safeString(item.title) || "-"}</p>
+                      {safeString(item.type).toLowerCase() === "flight" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {summarizeFlightMeta(item.meta) || "-"}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 text-slate-600">{safeString(item.supplier_name) || "-"}</td>
                     <td className="px-3 py-3 text-slate-600">
                       <div>{formatDateTime(item.start_date)}</div>
@@ -527,6 +704,7 @@ export default function AdminBookingDetailPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge label={doc.type} />
+                    {doc.status ? <StatusBadge label={doc.status} /> : null}
                     <p className="truncate text-sm font-medium text-slate-900">{safeString(doc.name) || "-"}</p>
                   </div>
                   <p className="mt-1 text-xs text-slate-500">{formatDateTime(doc.created_at)}</p>
@@ -548,6 +726,46 @@ export default function AdminBookingDetailPage() {
             ))}
           </div>
         )}
+
+        {!loading ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              Supplier Invoices
+            </h4>
+            {supplierInvoices.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No supplier invoices uploaded yet.</p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {supplierInvoices.map((doc, index) => (
+                  <div
+                    key={`${doc.id ?? "supplier-invoice"}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">
+                        {safeString(doc.name) || safeString(doc.id) || "Supplier invoice"}
+                      </p>
+                      <p className="text-xs text-slate-500">{formatDateTime(doc.created_at)}</p>
+                    </div>
+                    {safeString(doc.url) ? (
+                      <a
+                        href={doc.url!}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-slate-300"
+                      >
+                        Open
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">No link</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -624,28 +842,82 @@ export default function AdminBookingDetailPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
-          <p className="text-xs text-slate-500">Safe admin actions (scaffold only; no direct data mutation)</p>
+          <p className="text-xs text-slate-500">Safe admin actions for payment links, documents and supplier sync</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => void triggerBookingAction("resendDocuments")}
-            disabled={loading || refreshing || actionLoading.resendDocuments || actionLoading.resyncSupplier}
+            onClick={() => void createPaymentLink()}
+            disabled={loading || refreshing || actionLoading.createPayment}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {actionLoading.resendDocuments ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Resend Documents
+            {actionLoading.createPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Create Payment Link
+          </button>
+          <button
+            type="button"
+            onClick={() => void triggerBookingAction("generateDocuments")}
+            disabled={
+              loading ||
+              refreshing ||
+              actionLoading.generateDocuments ||
+              actionLoading.resyncSupplier ||
+              actionLoading.createPayment
+            }
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {actionLoading.generateDocuments ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Generate Documents
           </button>
           <button
             type="button"
             onClick={() => void triggerBookingAction("resyncSupplier")}
-            disabled={loading || refreshing || actionLoading.resyncSupplier || actionLoading.resendDocuments}
+            disabled={
+              loading ||
+              refreshing ||
+              actionLoading.resyncSupplier ||
+              actionLoading.generateDocuments ||
+              actionLoading.createPayment
+            }
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {actionLoading.resyncSupplier ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Resync Supplier
           </button>
         </div>
+        {paymentLinkState.orderId || paymentLinkState.url ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-sm font-medium text-slate-900">
+              Payment Ref: {paymentLinkState.orderId || paymentLinkState.paymentId || "Not available"}
+            </p>
+            <p className="mt-1 text-sm text-slate-600 break-all">
+              Payment Link: {paymentLinkState.url || "Not available"}
+            </p>
+            {paymentLinkState.url ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a
+                  href={paymentLinkState.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  Open Link
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!paymentLinkState.url) return;
+                    void navigator.clipboard?.writeText(paymentLinkState.url);
+                    setActionNotice("Payment link copied.");
+                  }}
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  Copy Payment Link
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {actionNotice ? (
           <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             {actionNotice}

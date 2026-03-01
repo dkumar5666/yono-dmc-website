@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, Download, RefreshCw, Search } from "lucide-react";
 
 interface BookingListRow {
   booking_id?: string | null;
@@ -56,6 +56,12 @@ function TableSkeleton({ rows = 6 }: { rows?: number }) {
       ))}
     </div>
   );
+}
+
+function safeCell(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  return "";
 }
 
 export default function AdminBookingsPage() {
@@ -150,11 +156,49 @@ export default function AdminBookingsPage() {
   const canPrev = appliedOffset > 0;
   const canNext = appliedOffset + PAGE_LIMIT < total;
 
+  function exportCsv() {
+    const headers = ["booking_id", "customer_name", "status", "payment_status", "total_amount", "created_at"];
+    const csvRows = rows.map((row) =>
+      [
+        safeCell(row.booking_id),
+        safeCell(row.customer_name),
+        safeCell(row.status),
+        safeCell(row.payment_status),
+        safeCell(row.total_amount),
+        safeCell(row.created_at),
+      ]
+        .map((cell) => `"${cell.replaceAll('"', '""')}"`)
+        .join(",")
+    );
+
+    const csv = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">Bookings</h2>
-        <p className="text-sm text-slate-500">Admin booking drill-down with status, payment, and search filters.</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900">Bookings</h2>
+          <p className="text-sm text-slate-500">Admin booking drill-down with status, payment, and search filters.</p>
+        </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 disabled:opacity-50"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </button>
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

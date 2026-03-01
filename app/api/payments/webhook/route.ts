@@ -7,6 +7,7 @@ import {
 import { PaymentProvider } from "@/types/tos";
 import { writeHeartbeat } from "@/lib/system/heartbeat";
 import { acquireWebhookLock, markWebhookEvent } from "@/lib/system/webhookLock";
+import { recordAnalyticsEvent, recordRouteDuration } from "@/lib/system/opsTelemetry";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -41,6 +42,15 @@ function normalizeProvider(value: string | null): PaymentProvider | null {
 }
 
 export async function POST(req: Request) {
+  const startedAt = Date.now();
+  let perfStatusCode = 500;
+  let perfOutcome: "success" | "fail" | "warn" = "fail";
+  const finalize = (response: Response, outcome: "success" | "fail" | "warn"): Response => {
+    perfStatusCode = response.status;
+    perfOutcome = outcome;
+    return response;
+  };
+
   let webhookProviderForMark = "razorpay";
   let webhookEventIdForMark: string | null = null;
   let webhookEventTypeForMark: string | null = null;
@@ -58,14 +68,17 @@ export async function POST(req: Request) {
 
     const rawBody = await req.text();
     if (!verifyPaymentWebhookSignature(provider, rawBody, req.headers)) {
-      return apiError(req, 401, "INVALID_WEBHOOK_SIGNATURE", "Invalid webhook signature.");
+      return finalize(
+        apiError(req, 401, "INVALID_WEBHOOK_SIGNATURE", "Invalid webhook signature."),
+        "warn"
+      );
     }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(rawBody);
     } catch {
-      return apiError(req, 400, "INVALID_JSON", "Invalid webhook JSON payload.");
+      return finalize(apiError(req, 400, "INVALID_JSON", "Invalid webhook JSON payload."), "warn");
     }
 
     const payload = asRecord(parsed);
@@ -87,7 +100,7 @@ export async function POST(req: Request) {
     const lockResult = await acquireWebhookLock(provider, eventId, payload);
     if (lockResult.skipped) {
       await writeHeartbeat("payment_webhook", { received: true, lock: "skipped_duplicate" });
-      return apiSuccess(req, { ok: true, skipped: true }, 200);
+      return finalize(apiSuccess(req, { ok: true, skipped: true }, 200), "warn");
     }
     if (!lockResult.ok) {
       await writeHeartbeat("payment_webhook", {
@@ -117,11 +130,9 @@ export async function POST(req: Request) {
           payload: { error: "BOOKING_ID_MISSING" },
         });
       }
-      return apiError(
-        req,
-        400,
-        "BOOKING_ID_MISSING",
-        "bookingId is required in webhook payload."
+      return finalize(
+        apiError(req, 400, "BOOKING_ID_MISSING", "bookingId is required in webhook payload."),
+        "warn"
       );
     }
 
@@ -157,6 +168,16 @@ export async function POST(req: Request) {
         getNestedString(payload, ["payload", "payment", "entity", "currency"]),
       rawPayload: payload,
     });
+    await recordAnalyticsEvent({
+      event: "payment_success",
+      bookingId,
+      paymentId: providerPaymentId ?? result.payment?.id ?? null,
+      source: provider,
+      status: result.payment?.status ?? "processed",
+      meta: {
+        lifecycle_changed: result.lifecycleChanged,
+      },
+    });
 
     if (webhookEventIdForMark) {
       await markWebhookEvent(provider, eventId, {
@@ -167,7 +188,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return apiSuccess(req, result, 200);
+    return finalize(apiSuccess(req, result, 200), "success");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (webhookEventIdForMark) {
@@ -183,20 +204,33 @@ export async function POST(req: Request) {
       });
     }
     if (message.includes("Supabase is not configured")) {
-      return apiError(
-        req,
-        503,
-        "SUPABASE_NOT_CONFIGURED",
-        "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+      return finalize(
+        apiError(
+          req,
+          503,
+          "SUPABASE_NOT_CONFIGURED",
+          "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+        ),
+        "fail"
       );
     }
 
     if (message.includes("Booking not found")) {
-      return apiError(req, 404, "BOOKING_NOT_FOUND", message);
+      return finalize(apiError(req, 404, "BOOKING_NOT_FOUND", message), "warn");
     }
 
-    return apiError(req, 500, "PAYMENT_WEBHOOK_FAILED", "Failed to process payment webhook.", {
-      message,
+    return finalize(
+      apiError(req, 500, "PAYMENT_WEBHOOK_FAILED", "Failed to process payment webhook.", {
+        message,
+      }),
+      "fail"
+    );
+  } finally {
+    await recordRouteDuration({
+      route: "/api/payments/webhook",
+      durationMs: Date.now() - startedAt,
+      statusCode: perfStatusCode,
+      outcome: perfOutcome,
     });
   }
 }

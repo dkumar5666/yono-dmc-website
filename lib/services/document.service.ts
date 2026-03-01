@@ -30,11 +30,37 @@ function resolveDeps(deps?: Partial<DocumentServiceDeps>): DocumentServiceDeps {
   };
 }
 
+async function findExistingDocument(
+  storageClient: SupabaseRestClient,
+  bookingId: string,
+  type: DocumentType
+): Promise<TosDocument | null> {
+  try {
+    return await storageClient.selectSingle<TosDocument>(
+      "documents",
+      new URLSearchParams({
+        select: "*",
+        booking_id: `eq.${bookingId}`,
+        type: `eq.${type}`,
+        order: "created_at.desc",
+        limit: "1",
+      })
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function generateDocument(
   input: GenerateDocumentInput,
   deps?: Partial<DocumentServiceDeps>
 ): Promise<TosDocument> {
   const { documentsRepository, storageClient } = resolveDeps(deps);
+  const existing = await findExistingDocument(storageClient, input.bookingId, input.type);
+  if (existing) {
+    return existing;
+  }
+
   const documentId = randomUUID();
   const filePrefix = input.fileNamePrefix ?? input.type;
   const fileName = `${filePrefix}-${documentId}.pdf`;

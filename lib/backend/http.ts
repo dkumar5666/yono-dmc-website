@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 
 export interface ErrorPayload {
   ok: false;
+  code: string;
+  message: string;
+  requestId: string;
   error: {
     code: string;
     message: string;
@@ -31,6 +34,9 @@ export function apiError(
   const requestId = getRequestId(req);
   const payload: ErrorPayload = {
     ok: false,
+    code,
+    message,
+    requestId,
     error: { code, message, requestId, details },
   };
   const response = NextResponse.json(payload, { status });

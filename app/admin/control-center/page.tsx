@@ -35,6 +35,7 @@ interface ControlCenterPayload {
   revenueToday: number;
   activeBookings: number;
   pendingPayments: number;
+  supplierPendingConfirmations: number;
   refundLiability: number;
   missingDocuments: number;
   openSupportRequests: number;
@@ -53,6 +54,7 @@ const EMPTY_PAYLOAD: ControlCenterPayload = {
   revenueToday: 0,
   activeBookings: 0,
   pendingPayments: 0,
+  supplierPendingConfirmations: 0,
   refundLiability: 0,
   missingDocuments: 0,
   openSupportRequests: 0,
@@ -242,6 +244,7 @@ export default function AdminControlCenterPage() {
         revenueToday: Number(resolved?.revenueToday ?? 0),
         activeBookings: Number(resolved?.activeBookings ?? 0),
         pendingPayments: Number(resolved?.pendingPayments ?? 0),
+        supplierPendingConfirmations: Number(resolved?.supplierPendingConfirmations ?? 0),
         refundLiability: Number(resolved?.refundLiability ?? 0),
         missingDocuments: Number(resolved?.missingDocuments ?? 0),
         openSupportRequests: Number(resolved?.openSupportRequests ?? 0),
@@ -387,6 +390,14 @@ export default function AdminControlCenterPage() {
                 href="/admin/documents?missing_only=1"
               />
               <MetricCard
+                label="Supplier Pending"
+                value={String(data.supplierPendingConfirmations)}
+                note="Bookings waiting supplier confirmation"
+                icon={AlertTriangle}
+                accent="border-amber-200 bg-amber-50 text-amber-600"
+                href="/admin/bookings?status=booking_created"
+              />
+              <MetricCard
                 label="Open Support"
                 value={String(data.openSupportRequests)}
                 note="Open requests (last 30 days)"
@@ -436,8 +447,12 @@ export default function AdminControlCenterPage() {
             {data.alerts.map((alert, index) => {
               const styles = alertStyles(alert.severity);
               const alertMessage = alert.message?.trim() || "System alert";
-              const alertHref = /pending payments/i.test(alertMessage)
+              const alertHref = /webhook.*stale|cron.*stale|retry.*stale/i.test(alertMessage)
+                ? "/admin/system/health"
+                : /pending payments/i.test(alertMessage)
                 ? "/admin/bookings?payment_status=pending"
+                : /supplier confirmations?.*pending|pending supplier confirmations?/i.test(alertMessage)
+                  ? "/admin/bookings?status=booking_created"
                 : /documents?.*(missing|pending)|missing.*documents?/i.test(alertMessage)
                   ? "/admin/documents?missing_only=1"
                   : /support requests?|open support/i.test(alertMessage)

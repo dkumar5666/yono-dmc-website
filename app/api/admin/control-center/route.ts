@@ -57,6 +57,7 @@ interface ControlCenterResponse {
   revenueToday: number;
   activeBookings: number;
   pendingPayments: number;
+  supplierPendingConfirmations: number;
   refundLiability: number;
   missingDocuments: number;
   openSupportRequests: number;
@@ -75,6 +76,7 @@ const EMPTY_RESPONSE: ControlCenterResponse = {
   revenueToday: 0,
   activeBookings: 0,
   pendingPayments: 0,
+  supplierPendingConfirmations: 0,
   refundLiability: 0,
   missingDocuments: 0,
   openSupportRequests: 0,
@@ -140,6 +142,49 @@ async function safeCountByQuery(
   return rows.length;
 }
 
+function safeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isStale(value: string | null, minutes: number): boolean {
+  if (!value) return true;
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) return true;
+  return Date.now() - ts > minutes * 60 * 1000;
+}
+
+async function getLatestHeartbeat(
+  db: SupabaseRestClient,
+  kind: "cron_retry" | "payment_webhook"
+): Promise<string | null> {
+  const heartbeatRows = await safeSelectMany<{ created_at?: string | null }>(
+    db,
+    "system_heartbeats",
+    new URLSearchParams({
+      select: "created_at,kind",
+      kind: `eq.${kind}`,
+      order: "created_at.desc",
+      limit: "1",
+    })
+  );
+  const direct = safeString(heartbeatRows[0]?.created_at);
+  if (direct) return direct;
+
+  const fallbackRows = await safeSelectMany<{ created_at?: string | null; event?: string | null; message?: string | null }>(
+    db,
+    "system_logs",
+    new URLSearchParams({
+      select: "created_at,event,message",
+      event: "eq.heartbeat",
+      message: `eq.${kind}`,
+      order: "created_at.desc",
+      limit: "1",
+    })
+  );
+  const fallback = safeString(fallbackRows[0]?.created_at);
+  return fallback || null;
+}
+
 async function getRevenueToday(
   db: SupabaseRestClient,
   dayWindow: { startUtc: string; endUtc: string }
@@ -178,6 +223,83 @@ async function getPendingPayments(db: SupabaseRestClient): Promise<number> {
   query.set("select", "id");
   query.set("payment_status", "in.(pending,payment_pending)");
   return safeCountByQuery(db, "bookings", query);
+}
+
+async function getSupplierPendingConfirmations(db: SupabaseRestClient): Promise<number> {
+  const bookingIds = new Set<string>();
+
+  const bookingItemRows = await safeSelectMany<{ booking_id?: string | null; status?: string | null }>(
+    db,
+    "booking_items",
+    new URLSearchParams({
+      select: "booking_id,status,supplier_id",
+      supplier_id: "not.is.null",
+      limit: "5000",
+    })
+  );
+  for (const row of bookingItemRows) {
+    const bookingId = safeString(row.booking_id);
+    const status = safeString(row.status).toLowerCase();
+    if (!bookingId) continue;
+    if (!status || status.includes("pending") || status.includes("new")) {
+      bookingIds.add(bookingId);
+    }
+  }
+
+  const groundRows = await safeSelectMany<{ booking_id?: string | null; status?: string | null }>(
+    db,
+    "ground_services",
+    new URLSearchParams({
+      select: "booking_id,status,supplier_id",
+      supplier_id: "not.is.null",
+      limit: "5000",
+    })
+  );
+  for (const row of groundRows) {
+    const bookingId = safeString(row.booking_id);
+    const status = safeString(row.status).toLowerCase();
+    if (!bookingId) continue;
+    if (!status || status.includes("pending") || status.includes("new")) {
+      bookingIds.add(bookingId);
+    }
+  }
+
+  const bookingRows = await safeSelectMany<{ id?: string | null; supplier_status?: string | null; supplier_id?: string | null }>(
+    db,
+    "bookings",
+    new URLSearchParams({
+      select: "id,supplier_status,supplier_id",
+      supplier_id: "not.is.null",
+      limit: "5000",
+    })
+  );
+  for (const row of bookingRows) {
+    const bookingId = safeString(row.id);
+    const status = safeString(row.supplier_status).toLowerCase();
+    if (!bookingId) continue;
+    if (!status || status.includes("pending") || status.includes("new")) {
+      bookingIds.add(bookingId);
+    }
+  }
+
+  const assignmentRows = await safeSelectMany<{ booking_id?: string | null; status?: string | null }>(
+    db,
+    "supplier_assignments",
+    new URLSearchParams({
+      select: "booking_id,status",
+      limit: "5000",
+    })
+  );
+  for (const row of assignmentRows) {
+    const bookingId = safeString(row.booking_id);
+    const status = safeString(row.status).toLowerCase();
+    if (!bookingId) continue;
+    if (!status || status.includes("pending") || status.includes("new")) {
+      bookingIds.add(bookingId);
+    }
+  }
+
+  return bookingIds.size;
 }
 
 async function getRefundLiability(db: SupabaseRestClient): Promise<number> {
@@ -278,7 +400,7 @@ async function getFailedAutomations24h(db: SupabaseRestClient): Promise<number> 
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const candidates: Array<{ table: string; query: URLSearchParams }> = [
     {
-      table: "event_failures",
+      table: "automation_failures",
       query: new URLSearchParams({
         select: "id",
         status: "eq.failed",
@@ -286,7 +408,7 @@ async function getFailedAutomations24h(db: SupabaseRestClient): Promise<number> 
       }),
     },
     {
-      table: "automation_failures",
+      table: "event_failures",
       query: new URLSearchParams({
         select: "id",
         status: "eq.failed",
@@ -295,11 +417,11 @@ async function getFailedAutomations24h(db: SupabaseRestClient): Promise<number> 
     },
   ];
 
+  let total = 0;
   for (const candidate of candidates) {
-    const count = await safeCountByQuery(db, candidate.table, candidate.query);
-    if (count > 0) return count;
+    total += await safeCountByQuery(db, candidate.table, candidate.query);
   }
-  return 0;
+  return total;
 }
 
 async function getRetryingAutomations(db: SupabaseRestClient): Promise<number> {
@@ -320,11 +442,11 @@ async function getRetryingAutomations(db: SupabaseRestClient): Promise<number> {
     },
   ];
 
+  let total = 0;
   for (const candidate of candidates) {
-    const count = await safeCountByQuery(db, candidate.table, candidate.query);
-    if (count > 0) return count;
+    total += await safeCountByQuery(db, candidate.table, candidate.query);
   }
-  return 0;
+  return total;
 }
 
 function formatCustomerName(customer?: CustomerRow): string | null {
@@ -375,14 +497,35 @@ async function getRecentBookings(db: SupabaseRestClient): Promise<ControlCenterR
 function buildFallbackAlerts(
   metrics: Pick<
     ControlCenterResponse,
-    "pendingPayments" | "activeBookings" | "missingDocuments" | "openSupportRequests" | "failedAutomations24h"
-  >
+    | "pendingPayments"
+    | "activeBookings"
+    | "missingDocuments"
+    | "openSupportRequests"
+    | "failedAutomations24h"
+    | "supplierPendingConfirmations"
+  > & {
+    cronStale: boolean;
+    webhookStale: boolean;
+  }
 ): ControlCenterAlert[] {
   const alerts: ControlCenterAlert[] = [];
-  if (metrics.pendingPayments > 0) {
+  if (metrics.webhookStale) {
     alerts.push({
-      severity: "warn",
-      message: "Pending payments require attention",
+      severity: "error",
+      message: "Payment webhook heartbeat is stale (> 2 hours)",
+    });
+  }
+  if (metrics.cronStale) {
+    alerts.push({
+      severity: "error",
+      message: "Cron retry heartbeat is stale (> 30 minutes)",
+    });
+  }
+  const pendingPaymentsThreshold = Number(process.env.PENDING_PAYMENTS_ALERT_THRESHOLD ?? "10");
+  if (metrics.pendingPayments > pendingPaymentsThreshold) {
+    alerts.push({
+      severity: "info",
+      message: "Pending payments are above threshold and need follow-up",
     });
   }
   if (metrics.activeBookings > 50) {
@@ -403,6 +546,12 @@ function buildFallbackAlerts(
       message: "Open support requests need attention",
     });
   }
+  if (metrics.supplierPendingConfirmations > 0) {
+    alerts.push({
+      severity: "warn",
+      message: "Supplier confirmations are pending",
+    });
+  }
   if (metrics.failedAutomations24h > 0) {
     alerts.push({
       severity: "error",
@@ -412,25 +561,52 @@ function buildFallbackAlerts(
   return alerts;
 }
 
-async function getAlertsFromEventFailures(db: SupabaseRestClient): Promise<ControlCenterAlert[]> {
-  const query = new URLSearchParams();
-  query.set("select", "event,reason,error,message,created_at");
-  query.set("order", "created_at.desc");
-  query.set("limit", "5");
+async function getAlertsFromFailureTables(db: SupabaseRestClient): Promise<ControlCenterAlert[]> {
+  const tableQueries: Array<{ table: string; select: string }> = [
+    {
+      table: "automation_failures",
+      select: "event,last_error,message,created_at,status",
+    },
+    {
+      table: "event_failures",
+      select: "event,reason,error,message,created_at,status",
+    },
+  ];
 
-  const rows = await db.selectMany<EventFailureRow>("event_failures", query);
-  return rows
-    .map((row) => {
-      const eventName = row.event?.trim() || "event";
-      const reason =
-        row.reason?.trim() || row.error?.trim() || row.message?.trim() || "Unknown failure";
-      return {
-        severity: "error" as const,
-        message: `[${eventName}] failed: ${reason}`,
-        created_at: row.created_at ?? undefined,
-      };
-    })
-    .filter((row) => row.message.trim().length > 0);
+  for (const tableQuery of tableQueries) {
+    const rows = await safeSelectMany<EventFailureRow>(
+      db,
+      tableQuery.table,
+      new URLSearchParams({
+        select: tableQuery.select,
+        order: "created_at.desc",
+        limit: "5",
+      })
+    );
+
+    if (rows.length === 0) continue;
+
+    const alerts = rows
+      .map((row) => {
+        const eventName = row.event?.trim() || "event";
+        const reason =
+          row.reason?.trim() ||
+          row.error?.trim() ||
+          (row as { last_error?: string | null }).last_error?.trim() ||
+          row.message?.trim() ||
+          "Unknown failure";
+        return {
+          severity: "error" as const,
+          message: `[${eventName}] failed: ${reason}`,
+          created_at: row.created_at ?? undefined,
+        };
+      })
+      .filter((row) => row.message.trim().length > 0);
+
+    if (alerts.length > 0) return alerts;
+  }
+
+  return [];
 }
 
 async function getAlertsFromSystemLogs(db: SupabaseRestClient): Promise<ControlCenterAlert[]> {
@@ -459,11 +635,37 @@ async function getAlerts(
   db: SupabaseRestClient,
   metrics: Pick<
     ControlCenterResponse,
-    "pendingPayments" | "activeBookings" | "missingDocuments" | "openSupportRequests" | "failedAutomations24h"
-  >
+    | "pendingPayments"
+    | "activeBookings"
+    | "missingDocuments"
+    | "openSupportRequests"
+    | "failedAutomations24h"
+    | "supplierPendingConfirmations"
+  > & {
+    cronStale: boolean;
+    webhookStale: boolean;
+  }
 ): Promise<ControlCenterAlert[]> {
   const appendDerivedAlerts = (alerts: ControlCenterAlert[]) => {
     const next = [...alerts];
+    if (
+      metrics.webhookStale &&
+      !next.some((alert) => /webhook.*stale/i.test(alert.message))
+    ) {
+      next.push({
+        severity: "error",
+        message: "Payment webhook heartbeat is stale (> 2 hours)",
+      });
+    }
+    if (
+      metrics.cronStale &&
+      !next.some((alert) => /cron.*stale|retry.*stale/i.test(alert.message))
+    ) {
+      next.push({
+        severity: "error",
+        message: "Cron retry heartbeat is stale (> 30 minutes)",
+      });
+    }
     if (
       metrics.missingDocuments > 0 &&
       !next.some((alert) => /documents?.*(missing|pending)|missing.*documents?/i.test(alert.message))
@@ -483,6 +685,15 @@ async function getAlerts(
       });
     }
     if (
+      metrics.supplierPendingConfirmations > 0 &&
+      !next.some((alert) => /supplier confirmations?.*pending|pending supplier confirmations?/i.test(alert.message))
+    ) {
+      next.push({
+        severity: "warn",
+        message: "Supplier confirmations are pending",
+      });
+    }
+    if (
       metrics.failedAutomations24h > 0 &&
       !next.some((alert) => /automation.*fail|failed automations?|event failures?/i.test(alert.message))
     ) {
@@ -491,13 +702,23 @@ async function getAlerts(
         message: "Automation failures detected in the last 24 hours",
       });
     }
+    const pendingPaymentsThreshold = Number(process.env.PENDING_PAYMENTS_ALERT_THRESHOLD ?? "10");
+    if (
+      metrics.pendingPayments > pendingPaymentsThreshold &&
+      !next.some((alert) => /pending payments?.*(threshold|follow-up|follow up)|threshold.*pending payments?/i.test(alert.message))
+    ) {
+      next.push({
+        severity: "info",
+        message: "Pending payments are above threshold and need follow-up",
+      });
+    }
     return next;
   };
 
   try {
-    const eventAlerts = await getAlertsFromEventFailures(db);
-    if (eventAlerts.length > 0) {
-      return appendDerivedAlerts(eventAlerts);
+    const failureAlerts = await getAlertsFromFailureTables(db);
+    if (failureAlerts.length > 0) {
+      return appendDerivedAlerts(failureAlerts);
     }
   } catch {
     // table may not exist
@@ -526,35 +747,48 @@ export async function GET(req: Request) {
       revenueToday,
       activeBookings,
       pendingPayments,
+      supplierPendingConfirmations,
       refundLiability,
       missingDocuments,
       openSupportRequests,
       failedAutomations24h,
       retryingAutomations,
       recentBookings,
+      lastCronRetryAt,
+      lastPaymentWebhookAt,
     ] = await Promise.all([
       getRevenueToday(db, dayWindow),
       getActiveBookings(db),
       getPendingPayments(db),
+      getSupplierPendingConfirmations(db),
       getRefundLiability(db),
       getMissingDocumentsCount(db),
       countOpenSupportRequestsLast30Days(),
       getFailedAutomations24h(db),
       getRetryingAutomations(db),
       getRecentBookings(db),
+      getLatestHeartbeat(db, "cron_retry"),
+      getLatestHeartbeat(db, "payment_webhook"),
     ]);
+
+    const cronStale = isStale(lastCronRetryAt, 30);
+    const webhookStale = isStale(lastPaymentWebhookAt, 120);
     const alerts = await getAlerts(db, {
       pendingPayments,
+      supplierPendingConfirmations,
       activeBookings,
       missingDocuments,
       openSupportRequests,
       failedAutomations24h,
+      cronStale,
+      webhookStale,
     });
 
     const payload: ControlCenterResponse = {
       revenueToday,
       activeBookings,
       pendingPayments,
+      supplierPendingConfirmations,
       refundLiability,
       missingDocuments,
       openSupportRequests,

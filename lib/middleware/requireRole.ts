@@ -11,7 +11,11 @@ import { routeError } from "@/lib/middleware/routeError";
 type AllowedRoles = AuthRole | AuthRole[];
 
 function normalizeAllowed(allowed: AllowedRoles): AuthRole[] {
-  return Array.isArray(allowed) ? allowed : [allowed];
+  const base = Array.isArray(allowed) ? allowed : [allowed];
+  if (base.includes("admin") && !base.includes("staff")) {
+    return [...base, "staff"];
+  }
+  return base;
 }
 
 export interface RequireRoleResult {

@@ -127,13 +127,13 @@ function isEventLikeLogRow(row: GenericRow): boolean {
 async function fetchFailureSourceRows(db: SupabaseRestClient): Promise<GenericRow[]> {
   const candidates: Array<{ table: string; queries: URLSearchParams[] }> = [
     {
-      table: "event_failures",
+      table: "automation_failures",
       queries: [
         new URLSearchParams({ select: "*", order: "created_at.desc", limit: "500" }),
       ],
     },
     {
-      table: "automation_failures",
+      table: "event_failures",
       queries: [
         new URLSearchParams({ select: "*", order: "created_at.desc", limit: "500" }),
       ],
@@ -227,4 +227,3 @@ export async function GET(req: Request) {
     return routeError(500, "Failed to load automation failures");
   }
 }
-

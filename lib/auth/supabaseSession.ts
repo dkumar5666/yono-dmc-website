@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 
-export type IdentityRole = "customer" | "agent" | "supplier" | "admin";
+export type IdentityRole = "customer" | "agent" | "supplier" | "staff" | "admin";
 
 export interface SupabaseSessionCookiePayload {
   accessToken: string;
@@ -162,7 +162,13 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
 
 export function normalizeRole(value: string | null | undefined): IdentityRole | undefined {
   const role = safeString(value).toLowerCase();
-  if (role === "customer" || role === "agent" || role === "supplier" || role === "admin") {
+  if (
+    role === "customer" ||
+    role === "agent" ||
+    role === "supplier" ||
+    role === "staff" ||
+    role === "admin"
+  ) {
     return role;
   }
   return undefined;

@@ -28,7 +28,7 @@ export default function OfficialLoginCard() {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         if (!response.ok) return;
         const payload = (await response.json()) as { user?: { role?: string } };
-        if (payload.user?.role === "admin") {
+        if (payload.user?.role === "admin" || payload.user?.role === "staff") {
           window.location.href = "/admin/control-center";
         }
       } catch {
@@ -48,7 +48,7 @@ export default function OfficialLoginCard() {
         body: JSON.stringify({
           email,
           password,
-          expectedRole: "admin",
+          expectedRoles: ["admin", "staff"],
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as ApiErrorShape & {
@@ -57,7 +57,7 @@ export default function OfficialLoginCard() {
       if (!response.ok) {
         throw new Error(readErrorMessage(payload, "Official login failed"));
       }
-      if (payload.data?.role !== "admin") {
+      if (payload.data?.role !== "admin" && payload.data?.role !== "staff") {
         throw new Error("This account is not configured for official access.");
       }
       window.location.href = "/admin/control-center";
@@ -122,4 +122,3 @@ export default function OfficialLoginCard() {
     </div>
   );
 }
-

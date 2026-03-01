@@ -19,6 +19,7 @@ import {
 } from "@/lib/auth/twilioVerifyFallback";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
 import { recordAnalyticsEvent } from "@/lib/system/opsTelemetry";
+import { getCustomerProfileCompletionStatus } from "@/lib/backend/customerAccount";
 
 const OTP_UNAVAILABLE_MESSAGE =
   "OTP service temporarily unavailable, please try Google login or retry in 2 minutes.";
@@ -101,10 +102,19 @@ export async function POST(req: Request) {
       phone: tokenPayload.user?.phone || phone,
     });
 
+    const resolvedRole = profile?.role || "customer";
+    let nextPath = sanitizeNextPath(context.nextPath);
+    if (resolvedRole === "customer" && nextPath === "/my-trips") {
+      const completed = await getCustomerProfileCompletionStatus(userId);
+      if (!completed) {
+        nextPath = "/account/onboarding";
+      }
+    }
+
     const response = apiSuccess(req, {
       verified: true,
-      role: profile?.role || "customer",
-      nextPath: sanitizeNextPath(context.nextPath),
+      role: resolvedRole,
+      nextPath,
     });
     response.headers.set("x-request-id", requestId);
     applySupabaseSessionCookie(response, tokenPayload, {
@@ -112,7 +122,7 @@ export async function POST(req: Request) {
       email: tokenPayload.user?.email || profile?.email || undefined,
       phone: tokenPayload.user?.phone || profile?.phone || phone,
       fullName: context.fullName || profile?.full_name || undefined,
-      role: profile?.role,
+      role: resolvedRole,
     });
     clearOtpContextCookie(response);
 
@@ -122,7 +132,7 @@ export async function POST(req: Request) {
         requestId,
         route: "/api/auth/supabase/otp/verify",
         outcome: "success",
-        role: profile?.role || "customer",
+        role: resolvedRole,
         provider: context.provider,
       },
       req
@@ -132,7 +142,7 @@ export async function POST(req: Request) {
       source: context.provider === "twilio_verify" ? "mobile_otp_twilio" : "mobile_otp",
       status: "success",
       meta: {
-        role: profile?.role || "customer",
+        role: resolvedRole,
       },
     });
 

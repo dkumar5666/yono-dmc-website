@@ -1,12 +1,24 @@
+import { randomUUID } from "node:crypto";
 import { apiError, apiSuccess } from "@/lib/backend/http";
 import { SupabaseNotConfiguredError, SupabaseRestClient } from "@/lib/core/supabase-rest";
 import { checkSupplierSignupRateLimit } from "@/lib/supplierSignup/rateLimit";
 import {
   getSupplierSignupRequestById,
   logSupplierSignupSystemEvent,
+  safeInsert,
+  safeSelectMany,
+  type SupplierSignupRequestRow,
   updateSupplierSignupRequest,
 } from "@/lib/supplierSignup/store";
-import { validateSupplierSignupRequestPayload } from "@/lib/supplierSignup/validators";
+import {
+  clearSupplierSignupContextCookie,
+  readSupplierSignupContextFromRequest,
+} from "@/lib/supplierSignup/signupContext";
+import {
+  normalizeEmail,
+  normalizePhone,
+  validateSupplierSignupRequestPayload,
+} from "@/lib/supplierSignup/validators";
 
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -15,6 +27,112 @@ function safeString(value: unknown): string {
 function safeObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
+}
+
+function normalizeRowId(row: SupplierSignupRequestRow | null): string {
+  return safeString(row?.id);
+}
+
+async function findExistingRequest(
+  db: SupabaseRestClient,
+  params: { contactEmail: string; contactPhone: string }
+): Promise<SupplierSignupRequestRow | null> {
+  const seen = new Map<string, SupplierSignupRequestRow>();
+
+  if (params.contactEmail) {
+    const rows = await safeSelectMany<SupplierSignupRequestRow>(
+      db,
+      "supplier_signup_requests",
+      new URLSearchParams({
+        select: "*",
+        contact_email: `eq.${params.contactEmail}`,
+        order: "created_at.desc",
+        limit: "5",
+      })
+    );
+    for (const row of rows) {
+      const id = normalizeRowId(row);
+      if (id) seen.set(id, row);
+    }
+  }
+
+  if (params.contactPhone) {
+    const rows = await safeSelectMany<SupplierSignupRequestRow>(
+      db,
+      "supplier_signup_requests",
+      new URLSearchParams({
+        select: "*",
+        contact_phone: `eq.${params.contactPhone}`,
+        order: "created_at.desc",
+        limit: "5",
+      })
+    );
+    for (const row of rows) {
+      const id = normalizeRowId(row);
+      if (id) seen.set(id, row);
+    }
+  }
+
+  const candidates = Array.from(seen.values());
+  candidates.sort((a, b) => {
+    const left = new Date(safeString(a.created_at) || 0).getTime() || 0;
+    const right = new Date(safeString(b.created_at) || 0).getTime() || 0;
+    return right - left;
+  });
+  return candidates[0] ?? null;
+}
+
+async function ensureRequestRow(
+  db: SupabaseRestClient,
+  params: {
+    requestId: string;
+    contactEmail: string;
+    contactPhone: string;
+    ip: string;
+    userAgent: string;
+  }
+): Promise<SupplierSignupRequestRow | null> {
+  if (params.requestId) {
+    return getSupplierSignupRequestById(db, params.requestId);
+  }
+
+  const existing = await findExistingRequest(db, {
+    contactEmail: params.contactEmail,
+    contactPhone: params.contactPhone,
+  });
+  if (existing) return existing;
+
+  const nowIso = new Date().toISOString();
+  const rowId = randomUUID();
+  const payload: Record<string, unknown> = {
+    id: rowId,
+    status: "pending",
+    contact_email: params.contactEmail,
+    contact_phone: params.contactPhone,
+    email_verified: true,
+    phone_verified: true,
+    docs: {},
+    meta: {
+      source_ip: params.ip,
+      user_agent: params.userAgent,
+      verification_gate: "otp_step1",
+    },
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const inserted = await safeInsert<SupplierSignupRequestRow>(
+    db,
+    "supplier_signup_requests",
+    payload
+  );
+  if (!inserted) {
+    return findExistingRequest(db, {
+      contactEmail: params.contactEmail,
+      contactPhone: params.contactPhone,
+    });
+  }
+  return inserted;
 }
 
 export async function POST(req: Request) {
@@ -37,14 +155,52 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const requestId = safeString(body.request_id);
+    const contactEmail = normalizeEmail(body.contact_email);
+    const contactPhone = normalizePhone(body.contact_phone);
+
+    const context = readSupplierSignupContextFromRequest(req);
     if (!requestId) {
-      return apiError(req, 400, "request_id_required", "request_id is required.");
+      if (!context || !context.emailVerified || !context.phoneVerified) {
+        return apiError(
+          req,
+          400,
+          "verification_pending",
+          "Complete email and mobile OTP verification before entering business details."
+        );
+      }
+      if (!contactEmail || !contactPhone) {
+        return apiError(req, 400, "contact_required", "Verified email and mobile are required.");
+      }
+      if (context.email !== contactEmail || context.phone !== contactPhone) {
+        return apiError(
+          req,
+          400,
+          "verification_context_mismatch",
+          "Email/mobile do not match verified values from step 1."
+        );
+      }
     }
 
     const db = new SupabaseRestClient();
-    const signupRequest = await getSupplierSignupRequestById(db, requestId);
+    const signupRequest = await ensureRequestRow(db, {
+      requestId,
+      contactEmail: requestId ? "" : contactEmail,
+      contactPhone: requestId ? "" : contactPhone,
+      ip: rate.ip,
+      userAgent: req.headers.get("user-agent") || "",
+    });
     if (!signupRequest) {
-      return apiError(req, 404, "request_not_found", "Supplier signup request not found.");
+      return apiError(
+        req,
+        503,
+        "supplier_signup_unavailable",
+        "Supplier signup requests are unavailable right now."
+      );
+    }
+
+    const actualRequestId = normalizeRowId(signupRequest);
+    if (!actualRequestId) {
+      return apiError(req, 500, "request_resolution_failed", "Failed to resolve signup request.");
     }
 
     const status = safeString(signupRequest.status);
@@ -55,19 +211,10 @@ export async function POST(req: Request) {
       return apiError(req, 400, "already_rejected", "Request is already rejected.");
     }
 
-    if (!signupRequest.email_verified || !signupRequest.phone_verified) {
-      return apiError(
-        req,
-        400,
-        "verification_pending",
-        "Complete email and mobile OTP verification before entering business details."
-      );
-    }
-
     const mergedPayload: Record<string, unknown> = {
       ...body,
-      contact_email: safeString(signupRequest.contact_email),
-      contact_phone: safeString(signupRequest.contact_phone),
+      contact_email: safeString(signupRequest.contact_email) || contactEmail,
+      contact_phone: safeString(signupRequest.contact_phone) || contactPhone,
     };
     const validation = validateSupplierSignupRequestPayload(mergedPayload);
     if (!validation.ok || !validation.data) {
@@ -86,7 +233,7 @@ export async function POST(req: Request) {
       details_saved_at: new Date().toISOString(),
     };
 
-    await updateSupplierSignupRequest(db, requestId, {
+    await updateSupplierSignupRequest(db, actualRequestId, {
       business_type: validation.data.business_type,
       company_legal_name: validation.data.company_legal_name,
       brand_name: validation.data.brand_name || null,
@@ -96,6 +243,8 @@ export async function POST(req: Request) {
       country: validation.data.country || "India",
       website: validation.data.website || null,
       contact_name: validation.data.contact_name,
+      contact_email: validation.data.contact_email,
+      contact_phone: validation.data.contact_phone,
       alt_phone: validation.data.alt_phone || null,
       support_email: validation.data.support_email || null,
       gstin: validation.data.gstin,
@@ -104,11 +253,13 @@ export async function POST(req: Request) {
       iata_code: validation.data.iata_code || null,
       license_no: validation.data.license_no || null,
       bank_meta: validation.data.bank_meta || {},
+      email_verified: true,
+      phone_verified: true,
       meta: nextMeta,
     });
 
     await logSupplierSignupSystemEvent(db, {
-      requestId,
+      requestId: actualRequestId,
       event: "supplier_signup_details_saved",
       message: "Supplier signup business details saved.",
       meta: {
@@ -117,10 +268,12 @@ export async function POST(req: Request) {
       },
     });
 
-    return apiSuccess(req, {
-      request_id: requestId,
+    const response = apiSuccess(req, {
+      request_id: actualRequestId,
       details_saved: true,
     });
+    clearSupplierSignupContextCookie(response);
+    return response;
   } catch (error) {
     if (error instanceof SupabaseNotConfiguredError) {
       return apiError(

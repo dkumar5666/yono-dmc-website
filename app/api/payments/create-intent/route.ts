@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/middleware/requireRole";
 import { verifyBookingOwnership } from "@/lib/middleware/verifyBookingOwnership";
 import { routeError } from "@/lib/middleware/routeError";
 import { NextResponse } from "next/server";
+import { recordAnalyticsEvent } from "@/lib/system/opsTelemetry";
 
 interface CreateIntentBody {
   bookingId?: string;
@@ -48,6 +49,13 @@ export async function POST(req: Request) {
       provider,
       idempotencyKey: body.idempotencyKey,
       customerId: auth.role === "admin" ? body.customerId : undefined,
+    });
+    await recordAnalyticsEvent({
+      event: "payment_initiated",
+      bookingId,
+      paymentId: result.payment?.id ?? null,
+      source: provider,
+      status: result.payment?.status ?? "created",
     });
 
     return apiSuccess(req, result, 201);

@@ -17,10 +17,17 @@ import {
   logSupplierSignupSystemEvent,
   updateSupplierSignupRequest,
 } from "@/lib/supplierSignup/store";
+import {
+  readSupplierSignupContextFromRequest,
+  setSupplierSignupContextCookie,
+} from "@/lib/supplierSignup/signupContext";
+import { normalizeEmail, normalizePhone } from "@/lib/supplierSignup/validators";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
 
 interface SendPhoneOtpBody {
   request_id?: string;
+  email?: string;
+  phone?: string;
 }
 
 function safeString(value: unknown): string {
@@ -48,23 +55,34 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as SendPhoneOtpBody;
     const signupRequestId = safeString(body.request_id);
+    const emailInput = normalizeEmail(body.email);
+    const phoneInput = normalizePhone(body.phone);
     if (!signupRequestId) {
-      return apiError(req, 400, "request_id_required", "request_id is required.");
+      if (!emailInput) return apiError(req, 400, "email_required", "Primary contact email is required.");
+      if (!phoneInput) return apiError(req, 400, "phone_required", "Primary contact mobile is required.");
     }
 
     const db = new SupabaseRestClient();
-    const signupRequest = await getSupplierSignupRequestById(db, signupRequestId);
-    if (!signupRequest) {
+    const signupRequest = signupRequestId
+      ? await getSupplierSignupRequestById(db, signupRequestId)
+      : null;
+    if (signupRequestId && !signupRequest) {
       return apiError(req, 404, "request_not_found", "Supplier signup request not found.");
     }
 
-    const phone = safeString(signupRequest.contact_phone);
+    const email = signupRequest
+      ? safeString(signupRequest.contact_email).toLowerCase()
+      : emailInput;
+    const phone = signupRequest ? safeString(signupRequest.contact_phone) : phoneInput;
     if (!phone) {
       return apiError(req, 400, "phone_missing", "Primary contact phone is missing.");
     }
-    if (signupRequest.phone_verified) {
+    if (!email) {
+      return apiError(req, 400, "email_missing", "Primary contact email is missing.");
+    }
+    if (signupRequest?.phone_verified) {
       return apiSuccess(req, {
-        request_id: signupRequestId,
+        request_id: signupRequestId || null,
         sent: false,
         verified: true,
       });
@@ -100,23 +118,27 @@ export async function POST(req: Request) {
     }
 
     const nowIso = new Date().toISOString();
-    const existingMeta =
-      signupRequest.meta && typeof signupRequest.meta === "object" ? signupRequest.meta : {};
-    const nextMeta = {
-      ...existingMeta,
-      phone_otp_sent_at: nowIso,
-      phone_otp_provider: provider,
-    };
-    await updateSupplierSignupRequest(db, signupRequestId, { meta: nextMeta });
+    if (signupRequestId && signupRequest) {
+      const existingMeta =
+        signupRequest.meta && typeof signupRequest.meta === "object" ? signupRequest.meta : {};
+      const nextMeta = {
+        ...existingMeta,
+        phone_otp_sent_at: nowIso,
+        phone_otp_provider: provider,
+      };
+      await updateSupplierSignupRequest(db, signupRequestId, { meta: nextMeta });
+    }
 
-    await logSupplierSignupSystemEvent(db, {
-      requestId: signupRequestId,
-      event: "supplier_signup_phone_otp_sent",
-      message: "Supplier signup phone OTP sent.",
-      meta: {
-        phone_suffix: phone.slice(-4),
-      },
-    });
+    if (signupRequestId) {
+      await logSupplierSignupSystemEvent(db, {
+        requestId: signupRequestId,
+        event: "supplier_signup_phone_otp_sent",
+        message: "Supplier signup phone OTP sent.",
+        meta: {
+          phone_suffix: phone.slice(-4),
+        },
+      });
+    }
 
     safeLog(
       "supplier.signup.otp.phone.send.success",
@@ -128,10 +150,26 @@ export async function POST(req: Request) {
       req
     );
 
-    return apiSuccess(req, {
-      request_id: signupRequestId,
+    const response = apiSuccess(req, {
+      request_id: signupRequestId || null,
       sent: true,
     });
+    if (!signupRequestId) {
+      const existingContext = readSupplierSignupContextFromRequest(req);
+      const sameContext =
+        existingContext &&
+        existingContext.email === email &&
+        existingContext.phone === phone;
+      setSupplierSignupContextCookie(response, {
+        email,
+        phone,
+        emailOtpProvider: sameContext ? existingContext.emailOtpProvider : undefined,
+        phoneOtpProvider: provider as "supabase_phone" | "twilio_verify",
+        emailVerified: sameContext ? existingContext.emailVerified : false,
+        phoneVerified: sameContext ? existingContext.phoneVerified : false,
+      });
+    }
+    return response;
   } catch (error) {
     if (error instanceof SupabaseNotConfiguredError) {
       return apiError(
@@ -166,6 +204,14 @@ export async function POST(req: Request) {
       );
     }
     if (error instanceof TwilioVerifyRequestError) {
+      if (error.status === 401 || error.status === 403) {
+        return apiError(
+          req,
+          503,
+          "otp_provider_unavailable",
+          "Mobile OTP provider authentication failed. Please contact support."
+        );
+      }
       return apiError(
         req,
         error.status >= 500 ? 502 : 400,

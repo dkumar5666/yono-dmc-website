@@ -19,9 +19,15 @@ function firstHeaderValue(value: string | null): string {
 }
 
 export function getPublicBaseUrl(req: Request): string {
+  const productionSiteUrl = process.env.SITE_URL?.trim();
+  if (process.env.NODE_ENV === "production" && productionSiteUrl) {
+    const normalizedProductionSiteUrl = normalizeBaseUrl(productionSiteUrl);
+    if (normalizedProductionSiteUrl) return normalizedProductionSiteUrl;
+  }
+
   const envBase =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     process.env.SITE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     process.env.APP_URL?.trim() ||
     process.env.NEXTAUTH_URL?.trim();
 

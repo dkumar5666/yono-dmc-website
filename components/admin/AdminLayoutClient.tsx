@@ -83,9 +83,11 @@ function NavList({
 export function AdminLayoutClient({
   children,
   initialUser,
+  appMode,
 }: {
   children: React.ReactNode;
   initialUser: AdminSessionUser;
+  appMode: "staging" | "production";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -406,6 +408,11 @@ export function AdminLayoutClient({
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
                   <Shield className="h-3.5 w-3.5" />
                   Admin Workspace
+                  {appMode === "staging" ? (
+                    <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-amber-700">
+                      STAGING
+                    </span>
+                  ) : null}
                 </div>
                 <h1 className="truncate text-lg font-semibold text-slate-900 sm:text-xl">{pageTitle}</h1>
               </div>

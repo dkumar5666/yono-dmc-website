@@ -11,6 +11,12 @@ interface SystemHealthPayload {
   missingDocuments: number;
   webhookEvents24h: number;
   webhookSkipped24h: number;
+  integrationStatus?: {
+    cronRetry?: "ok" | "stale" | "unknown";
+    paymentWebhook?: "ok" | "stale" | "unknown";
+    amadeus?: "ok" | "failed" | "skipped";
+    storage?: "ok" | "failed" | "skipped";
+  };
 }
 
 const EMPTY_PAYLOAD: SystemHealthPayload = {
@@ -21,6 +27,12 @@ const EMPTY_PAYLOAD: SystemHealthPayload = {
   missingDocuments: 0,
   webhookEvents24h: 0,
   webhookSkipped24h: 0,
+  integrationStatus: {
+    cronRetry: "unknown",
+    paymentWebhook: "unknown",
+    amadeus: "skipped",
+    storage: "skipped",
+  },
 };
 
 function formatDateTime(value?: string | null): string {
@@ -133,6 +145,7 @@ export default function AdminSystemHealthPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "done" | "failed">("idle");
   const inFlightRef = useRef(false);
 
   const loadHealth = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -161,6 +174,7 @@ export default function AdminSystemHealthPage() {
         missingDocuments: Number(payload.missingDocuments ?? 0),
         webhookEvents24h: Number(payload.webhookEvents24h ?? 0),
         webhookSkipped24h: Number(payload.webhookSkipped24h ?? 0),
+        integrationStatus: payload.integrationStatus,
       });
       setLastUpdatedAt(new Date().toISOString());
     } catch (err) {
@@ -183,6 +197,30 @@ export default function AdminSystemHealthPage() {
   const cronStale = useMemo(() => isStale(data.lastCronRetryAt, 15), [data.lastCronRetryAt]);
   const webhookStale = useMemo(() => isStale(data.lastPaymentWebhookAt, 60), [data.lastPaymentWebhookAt]);
   const hardFail = cronStale === true || webhookStale === true;
+
+  const incidentChecklist = useMemo(
+    () =>
+      [
+        "Incident Checklist (Yono DMC)",
+        "1) Verify payment webhook freshness and delivery logs.",
+        "2) Verify cron retry freshness and last execution summary.",
+        "3) Open automation failures queue and check latest failed events.",
+        "4) Run retry endpoint manually for blocked failures if needed.",
+        "5) Resolve or mark resolved only after verification in logs.",
+      ].join("\n"),
+    []
+  );
+
+  async function copyIncidentChecklist() {
+    try {
+      await navigator.clipboard.writeText(incidentChecklist);
+      setCopyState("done");
+      window.setTimeout(() => setCopyState("idle"), 1500);
+    } catch {
+      setCopyState("failed");
+      window.setTimeout(() => setCopyState("idle"), 1500);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -208,6 +246,13 @@ export default function AdminSystemHealthPage() {
         >
           {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Refresh
+        </button>
+        <button
+          type="button"
+          onClick={() => void copyIncidentChecklist()}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300"
+        >
+          {copyState === "done" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy Incident Checklist"}
         </button>
       </div>
 
@@ -296,6 +341,37 @@ export default function AdminSystemHealthPage() {
             />
           </>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-slate-900">Integration Status</h3>
+          <p className="text-xs text-slate-500">Runtime checks for launch-critical integrations</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Razorpay Webhook", value: data.integrationStatus?.paymentWebhook ?? "unknown" },
+            { label: "Cron Retry", value: data.integrationStatus?.cronRetry ?? "unknown" },
+            { label: "Amadeus Token Ping", value: data.integrationStatus?.amadeus ?? "skipped" },
+            { label: "Storage Bucket Access", value: data.integrationStatus?.storage ?? "skipped" },
+          ].map((item) => {
+            const status = item.value;
+            const statusClass =
+              status === "ok"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : status === "stale" || status === "failed"
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700";
+            return (
+              <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">{item.label}</p>
+                <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClass}`}>
+                  {status.toUpperCase()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

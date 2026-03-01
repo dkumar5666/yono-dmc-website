@@ -10,6 +10,28 @@ function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function markResolvedInTable(
+  db: SupabaseRestClient,
+  table: string,
+  failureId: string
+): Promise<boolean> {
+  try {
+    const updated = await db.updateSingle<Record<string, unknown>>(
+      table,
+      new URLSearchParams({
+        id: `eq.${failureId}`,
+      }),
+      {
+        status: "resolved",
+        updated_at: new Date().toISOString(),
+      }
+    );
+    return Boolean(updated);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<Params> | Params }
@@ -22,14 +44,22 @@ export async function POST(
     const failureId = decodeURIComponent(resolved.id ?? "").trim();
     if (!failureId) return routeError(404, "Automation failure not found");
 
+    const db = new SupabaseRestClient();
+    const marked =
+      (await markResolvedInTable(db, "automation_failures", failureId)) ||
+      (await markResolvedInTable(db, "event_failures", failureId));
+
+    if (!marked) {
+      return routeError(404, "Automation failure not found");
+    }
+
     try {
-      const db = new SupabaseRestClient();
       await writeAdminAuditLog(db, {
         adminId: auth.userId,
         action: "mark_failure_resolved",
         entityType: "automation_failure",
         entityId: failureId,
-        message: "Mark automation failure resolved requested (scaffold action)",
+        message: "Automation failure marked as resolved",
         meta: {
           actor_role: auth.role ?? "admin",
           actor_user_id: auth.userId ?? null,
@@ -44,10 +74,9 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
-      message: "Resolve action recorded. Failure status updates are not enabled in this phase.",
+      message: "Failure marked as resolved.",
     });
   } catch {
-    return routeError(500, "Failed to record mark resolved action");
+    return routeError(500, "Failed to mark automation failure as resolved");
   }
 }
-

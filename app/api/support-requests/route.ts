@@ -9,6 +9,7 @@ import {
   listCustomerSupportRequestsByBooking,
   SupportSystemUnavailableError,
 } from "@/lib/backend/supportRequests";
+import { recordAnalyticsEvent } from "@/lib/system/opsTelemetry";
 
 const ALLOWED_CATEGORIES = new Set(["voucher", "payment", "cancellation", "change", "other"]);
 
@@ -130,6 +131,16 @@ export async function POST(req: Request) {
       category: category as "voucher" | "payment" | "cancellation" | "change" | "other",
       subject,
       message,
+    });
+    await recordAnalyticsEvent({
+      event: "support_request_created",
+      leadId: null,
+      bookingId,
+      source: "customer_portal",
+      status: "open",
+      meta: {
+        category,
+      },
     });
     return apiSuccess(req, { ok: true, id: created.id });
   } catch (error) {

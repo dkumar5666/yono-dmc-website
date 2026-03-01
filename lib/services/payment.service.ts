@@ -12,6 +12,7 @@ import {
   SupabasePaymentsRepository,
 } from "@/lib/core/booking-lifecycle.repository";
 import { transitionBookingLifecycle } from "@/lib/core/booking-lifecycle.engine";
+import { recordAutomationFailure } from "@/lib/system/automationFailures";
 
 interface PaymentServiceDeps {
   lifecycleRepository: SupabaseBookingLifecycleRepository;
@@ -217,18 +218,37 @@ export async function handlePaymentWebhook(
 
   let lifecycleChanged = false;
   if (targetStatus === "captured") {
-    await transitionBookingLifecycle({
-      bookingId: payload.bookingId,
-      toStatus: "payment_confirmed",
-      actorType: "webhook",
-      note: `${payload.provider} webhook: ${payload.eventType}`,
-      idempotencyKey: `webhook:${payload.eventId}`,
-      metadata: {
-        provider: payload.provider,
-        paymentId: patched.id,
-      },
-    });
-    lifecycleChanged = true;
+    try {
+      await transitionBookingLifecycle({
+        bookingId: payload.bookingId,
+        toStatus: "payment_confirmed",
+        actorType: "webhook",
+        note: `${payload.provider} webhook: ${payload.eventType}`,
+        idempotencyKey: `webhook:${payload.eventId}`,
+        metadata: {
+          provider: payload.provider,
+          paymentId: patched.id,
+        },
+      });
+      lifecycleChanged = true;
+    } catch (error) {
+      await recordAutomationFailure({
+        bookingId: payload.bookingId,
+        event: "payment.confirmed",
+        errorMessage: error instanceof Error ? error.message : "Payment confirmed automation failed",
+        payload: {
+          booking_id: payload.bookingId,
+          event_type: payload.eventType,
+          provider: payload.provider,
+          payment_id: patched.id,
+        },
+        meta: {
+          source: "payment.webhook",
+          event_id: payload.eventId,
+        },
+      });
+      throw error;
+    }
   }
 
   if (targetStatus === "refunded") {

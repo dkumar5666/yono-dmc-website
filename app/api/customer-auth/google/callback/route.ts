@@ -11,6 +11,7 @@ import {
 import { getPublicBaseUrl } from "@/lib/auth/baseUrl";
 import { upsertCustomer } from "@/lib/backend/customerStore";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
+import { recordAnalyticsEvent, recordRouteDuration } from "@/lib/system/opsTelemetry";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
@@ -47,6 +48,17 @@ async function parseJsonSafe<T>(res: Response): Promise<T | null> {
 
 export async function GET(req: Request) {
   const requestId = getRequestId(req);
+  const startedAt = Date.now();
+  let perfStatusCode = 500;
+  let perfOutcome: "success" | "fail" | "warn" = "fail";
+  const finalize = (
+    response: NextResponse,
+    outcome: "success" | "fail" | "warn"
+  ): NextResponse => {
+    perfStatusCode = response.status;
+    perfOutcome = outcome;
+    return response;
+  };
   try {
     const url = new URL(req.url);
     const baseUrl = getPublicBaseUrl(req);
@@ -76,7 +88,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_provider_error", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_provider_error", requestId), "warn");
     }
 
     const code = url.searchParams.get("code");
@@ -91,7 +103,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_missing_code", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_missing_code", requestId), "warn");
     }
 
     const state = url.searchParams.get("state");
@@ -107,7 +119,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_state_mismatch", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_state_mismatch", requestId), "warn");
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -129,7 +141,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_oauth_not_configured", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_oauth_not_configured", requestId), "fail");
     }
 
     const hasSessionSecret = Boolean(
@@ -151,7 +163,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_oauth_not_configured", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_oauth_not_configured", requestId), "fail");
     }
 
     const redirectUri = `${baseUrl}/api/customer-auth/google/callback`;
@@ -190,7 +202,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_token_exchange_failed", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_token_exchange_failed", requestId), "warn");
     }
 
     const tokenJson = await parseJsonSafe<GoogleTokenResponse>(tokenRes);
@@ -206,7 +218,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_token_exchange_failed", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_token_exchange_failed", requestId), "warn");
     }
 
     const userRes = await fetch(GOOGLE_USERINFO_URL, {
@@ -226,7 +238,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_userinfo_failed", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_userinfo_failed", requestId), "warn");
     }
 
     const user = await parseJsonSafe<GoogleUserInfo>(userRes);
@@ -241,7 +253,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_profile_missing", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_profile_missing", requestId), "warn");
     }
     if (!user.email) {
       safeLog(
@@ -254,7 +266,7 @@ export async function GET(req: Request) {
         },
         req
       );
-      return loginErrorRedirect(baseUrl, "google_email_missing", requestId);
+      return finalize(loginErrorRedirect(baseUrl, "google_email_missing", requestId), "warn");
     }
 
     const customer = upsertCustomer({
@@ -286,7 +298,13 @@ export async function GET(req: Request) {
       },
       req
     );
-    return response;
+    await recordAnalyticsEvent({
+      event: "login_success",
+      source: "google",
+      status: "success",
+      meta: { role: "customer" },
+    });
+    return finalize(response, "success");
   } catch (error) {
     const url = new URL(req.url);
     console.error("[google-oauth] callback failed", {
@@ -319,6 +337,13 @@ export async function GET(req: Request) {
     );
 
     const baseUrl = getPublicBaseUrl(req);
-    return loginErrorRedirect(baseUrl, "google_auth_failed", requestId);
+    return finalize(loginErrorRedirect(baseUrl, "google_auth_failed", requestId), "fail");
+  } finally {
+    await recordRouteDuration({
+      route: "/api/customer-auth/google/callback",
+      durationMs: Date.now() - startedAt,
+      statusCode: perfStatusCode,
+      outcome: perfOutcome,
+    });
   }
 }

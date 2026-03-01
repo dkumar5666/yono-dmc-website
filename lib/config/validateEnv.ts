@@ -76,6 +76,7 @@ export function validateEnv(): EnvValidationResult {
 
   // Internal
   if (!has("INTERNAL_CRON_KEY")) pushMissing(missing, "INTERNAL_CRON_KEY");
+  if (!has("APP_MODE")) pushWarning(warnings, "Set APP_MODE to staging or production for release-safe behavior.");
 
   // Supplier (Amadeus)
   if (!has("AMADEUS_CLIENT_ID")) pushMissing(missing, "AMADEUS_CLIENT_ID");

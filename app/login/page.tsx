@@ -8,18 +8,20 @@ import { ArrowLeft } from "lucide-react";
 
 interface ApiErrorShape {
   ok?: false;
+  code?: string;
+  message?: string;
   error?: {
     code?: string;
     message?: string;
   };
 }
 
-interface OtpVerifySuccess {
+interface LoginApiSuccess {
   ok?: true;
   data?: {
-    verified?: boolean;
-    nextPath?: string;
+    login_session_id?: string;
     redirectTo?: string;
+    nextPath?: string;
   };
 }
 
@@ -32,15 +34,19 @@ interface MeSuccessShape {
 
 type LoginView = "entry" | "email_verify" | "password";
 
-function readErrorMessage(payload: unknown, fallback: string): string {
+function readError(payload: unknown, fallback: string): { code: string; message: string } {
   const row = payload as ApiErrorShape | null;
-  return row?.error?.message || fallback;
+  return {
+    code: row?.error?.code || row?.code || "UNKNOWN",
+    message: row?.error?.message || row?.message || fallback,
+  };
 }
 
 function sanitizeNextPath(nextPath: string | null): string {
   if (!nextPath) return "/my-trips";
   if (!nextPath.startsWith("/")) return "/my-trips";
   if (nextPath.startsWith("//")) return "/my-trips";
+  if (nextPath.startsWith("/api/")) return "/my-trips";
   return nextPath;
 }
 
@@ -55,10 +61,12 @@ function LoginContent() {
   const [email, setEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [password, setPassword] = useState("");
+  const [emailOtpSessionId, setEmailOtpSessionId] = useState("");
   const [resendCountdown, setResendCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const oauthErrorMessage = useMemo(() => {
     if (!oauthError) return null;
@@ -68,8 +76,7 @@ function LoginContent() {
       google_provider_error: "Google login was cancelled or failed.",
       google_token_exchange_failed: "Google token exchange failed. Please retry.",
       google_auth_failed: "Google login failed. Please retry.",
-      google_account_not_registered: "This Google account is not registered. Please create an account first.",
-      supabase_auth_not_configured: "Supabase Auth is not configured yet.",
+      supabase_auth_not_configured: "Google login is not configured yet.",
     };
     return map[oauthError] || "Login failed. Please try again.";
   }, [oauthError]);
@@ -77,6 +84,7 @@ function LoginContent() {
   useEffect(() => {
     if (!oauthErrorMessage) return;
     setError(oauthErrorMessage);
+    setErrorCode("GOOGLE_ERROR");
   }, [oauthErrorMessage]);
 
   useEffect(() => {
@@ -92,7 +100,6 @@ function LoginContent() {
       try {
         const response = await fetch("/api/customer-auth/me", { cache: "no-store" });
         if (!response.ok) return;
-
         const payload = (await response.json().catch(() => ({}))) as MeSuccessShape;
         if (!payload?.data?.profile_completed) {
           window.location.href = "/account/onboarding";
@@ -105,24 +112,36 @@ function LoginContent() {
     })();
   }, [nextPath]);
 
-  async function onGoogleLogin() {
+  function resetNotices() {
     setError(null);
+    setErrorCode(null);
     setMessage(null);
+  }
+
+  async function onGoogleLogin() {
+    resetNotices();
     const query = new URLSearchParams({ next: nextPath });
     window.location.href = `/api/auth/supabase/google/start?${query.toString()}`;
   }
 
   async function sendEmailOtpRequest() {
-    const response = await fetch("/api/auth/supabase/email-otp/send", {
+    const response = await fetch("/api/customer-auth/login/email-otp/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, next: nextPath, intent: "login" }),
+      body: JSON.stringify({ email }),
     });
-    const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
+    const payload = (await response.json().catch(() => ({}))) as LoginApiSuccess & ApiErrorShape;
     if (!response.ok) {
-      throw new Error(readErrorMessage(payload, "Failed to send email OTP"));
+      const err = readError(payload, "Failed to send email OTP");
+      setErrorCode(err.code);
+      throw new Error(err.message);
     }
-
+    const sessionId = payload.data?.login_session_id || "";
+    if (!sessionId) {
+      setErrorCode("LOGIN_SESSION_MISSING");
+      throw new Error("Email login session could not be created. Please retry.");
+    }
+    setEmailOtpSessionId(sessionId);
     setView("email_verify");
     setResendCountdown(60);
     setMessage("A 6-digit code has been sent to your email.");
@@ -130,8 +149,7 @@ function LoginContent() {
 
   async function onSendEmailOtp(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
     try {
       await sendEmailOtpRequest();
@@ -144,8 +162,7 @@ function LoginContent() {
 
   async function onResendEmailOtp() {
     if (resendCountdown > 0 || loading) return;
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
     try {
       await sendEmailOtpRequest();
@@ -158,22 +175,27 @@ function LoginContent() {
 
   async function onVerifyEmailOtp(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/supabase/email-otp/verify", {
+      const response = await fetch("/api/customer-auth/login/email-otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, token: emailOtp, next: nextPath, intent: "login" }),
+        body: JSON.stringify({
+          login_session_id: emailOtpSessionId,
+          otp: emailOtp,
+          next: nextPath,
+        }),
       });
-      const payload = (await response.json().catch(() => ({}))) as OtpVerifySuccess & ApiErrorShape;
+      const payload = (await response.json().catch(() => ({}))) as LoginApiSuccess & ApiErrorShape;
       if (!response.ok) {
-        throw new Error(readErrorMessage(payload, "Email OTP verification failed"));
+        const err = readError(payload, "Email OTP verification failed");
+        setErrorCode(err.code);
+        throw new Error(err.message);
       }
 
-      const next = payload.data?.nextPath || payload.data?.redirectTo || nextPath || "/my-trips";
+      const next = payload.data?.redirectTo || payload.data?.nextPath || nextPath || "/my-trips";
       window.location.href = next;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email OTP verification failed");
@@ -184,25 +206,26 @@ function LoginContent() {
 
   async function onPasswordLogin(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/supabase/password/login", {
+      const response = await fetch("/api/customer-auth/login/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           password,
-          expectedRole: "customer",
+          next: nextPath,
         }),
       });
-      const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
+      const payload = (await response.json().catch(() => ({}))) as LoginApiSuccess & ApiErrorShape;
       if (!response.ok) {
-        throw new Error(readErrorMessage(payload, "Invalid email or password."));
+        const err = readError(payload, "Invalid email or password.");
+        setErrorCode(err.code);
+        throw new Error(err.message);
       }
-      window.location.href = nextPath;
+      window.location.href = payload.data?.redirectTo || nextPath;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -221,7 +244,11 @@ function LoginContent() {
 
         <div className="mx-auto mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
           <h1 className="text-[34px] font-semibold tracking-tight text-slate-900">
-            {view === "email_verify" ? "Let's confirm your email" : view === "password" ? "Sign in with password" : "Customer Login"}
+            {view === "email_verify"
+              ? "Let's confirm your email"
+              : view === "password"
+                ? "Sign in with password"
+                : "Customer Login"}
           </h1>
 
           <p className="mt-2 text-sm text-slate-600">
@@ -265,7 +292,7 @@ function LoginContent() {
                   disabled={loading}
                   className="inline-flex w-full items-center justify-center rounded-full bg-[#2563d7] px-4 py-3 font-semibold text-white hover:bg-[#1d4fc2] disabled:opacity-60"
                 >
-                  {loading ? "Please wait..." : "Continue with Email OTP"}
+                  {loading ? "Please wait..." : "Send Email OTP"}
                 </button>
               </form>
 
@@ -274,7 +301,7 @@ function LoginContent() {
                 onClick={() => setView("password")}
                 className="mt-4 w-full text-sm font-semibold text-[#2563d7] hover:underline"
               >
-                Sign in with password instead
+                Continue with Password
               </button>
 
               <Link
@@ -357,13 +384,27 @@ function LoginContent() {
                 onClick={() => setView("entry")}
                 className="w-full text-sm font-medium text-slate-500 hover:underline"
               >
-                Back to email OTP
+                Back to email login
               </button>
             </form>
           ) : null}
 
           {error ? (
-            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
+          {errorCode === "NOT_FOUND" || errorCode === "SIGNUP_INCOMPLETE" ? (
+            <div className="mt-3">
+              <Link
+                href={`/signup?next=${encodeURIComponent(nextPath)}`}
+                className="text-sm font-semibold text-[#2563d7] hover:underline"
+              >
+                {errorCode === "SIGNUP_INCOMPLETE"
+                  ? "Complete account signup."
+                  : "Account not found. Create account."}
+              </Link>
+            </div>
           ) : null}
           {message ? (
             <p className="mt-4 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm text-green-700">

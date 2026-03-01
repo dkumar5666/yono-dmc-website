@@ -4,49 +4,61 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Phone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+
+type SignupStep = "identity" | "verify" | "password";
 
 interface ApiErrorShape {
   ok?: false;
+  code?: string;
+  message?: string;
   error?: {
     code?: string;
     message?: string;
   };
 }
 
-interface MeShape {
+interface ApiSuccessShape {
+  ok?: true;
   data?: {
-    user?: {
-      email?: string;
-      phone?: string;
-    };
-    profile_completed?: boolean;
+    signup_session_id?: string;
+    redirectTo?: string;
+    cooldownSeconds?: number;
   };
 }
 
-type SignupStep = "identity" | "email_verify" | "mobile_verify" | "set_password";
+function sanitizeNextPath(nextPath: string | null): string {
+  if (!nextPath) return "/account/onboarding";
+  if (!nextPath.startsWith("/")) return "/account/onboarding";
+  if (nextPath.startsWith("//")) return "/account/onboarding";
+  if (nextPath.startsWith("/api/")) return "/account/onboarding";
+  return nextPath;
+}
 
-function readErrorMessage(payload: unknown, fallback: string): string {
+function readError(payload: unknown, fallback: string): { code: string; message: string } {
   const row = payload as ApiErrorShape | null;
-  return row?.error?.message || fallback;
+  return {
+    code: row?.error?.code || row?.code || "UNKNOWN",
+    message: row?.error?.message || row?.message || fallback,
+  };
 }
 
 function SignupContent() {
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/account/onboarding";
-  const roleHint = searchParams.get("role");
+  const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const [step, setStep] = useState<SignupStep>("identity");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [signupSessionId, setSignupSessionId] = useState("");
 
   const [emailOtp, setEmailOtp] = useState("");
-  const [mobileOtp, setMobileOtp] = useState("");
-  const [mobileSent, setMobileSent] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState("");
   const [countdown, setCountdown] = useState(0);
 
   const [password, setPassword] = useState("");
@@ -60,190 +72,86 @@ function SignupContent() {
     return () => window.clearInterval(timer);
   }, [countdown]);
 
-  useEffect(() => {
-    if (roleHint === "agent") {
-      const next = encodeURIComponent(nextPath || "/agent/dashboard");
-      window.location.replace(`/agent/signup?next=${next}`);
-      return;
-    }
-    void (async () => {
-      try {
-        const response = await fetch("/api/customer-auth/me", { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = (await response.json().catch(() => ({}))) as MeShape;
+  function resetNotices() {
+    setError(null);
+    setErrorCode(null);
+    setMessage(null);
+  }
 
-        if (payload?.data?.profile_completed) {
-          window.location.href = "/account";
-          return;
-        }
-
-        const meEmail = payload?.data?.user?.email || "";
-        const mePhone = payload?.data?.user?.phone || "";
-        if (meEmail) {
-          setEmail(meEmail);
-          setStep("mobile_verify");
-        }
-        if (mePhone) {
-          setPhone(mePhone);
-          setStep("set_password");
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [nextPath, roleHint]);
-
-  async function sendEmailOtp() {
-    const response = await fetch("/api/auth/supabase/email-otp/send", {
+  async function sendBothOtps() {
+    const response = await fetch("/api/customer-auth/signup/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        next: "/signup",
-        intent: "signup",
-      }),
+      body: JSON.stringify({ email, phone, country: "IN" }),
     });
-    const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
+    const payload = (await response.json().catch(() => ({}))) as ApiSuccessShape & ApiErrorShape;
     if (!response.ok) {
-      throw new Error(readErrorMessage(payload, "Failed to send email OTP"));
+      const err = readError(payload, "Failed to start signup");
+      setErrorCode(err.code);
+      throw new Error(err.message);
     }
-    setStep("email_verify");
-    setCountdown(60);
-    setMessage("Email OTP sent successfully.");
+    const sessionId = payload.data?.signup_session_id || "";
+    if (!sessionId) {
+      setErrorCode("SIGNUP_SESSION_MISSING");
+      throw new Error("Unable to initialize signup session. Please retry.");
+    }
+    setSignupSessionId(sessionId);
+    setCountdown(payload.data?.cooldownSeconds || 60);
+    setStep("verify");
+    setMessage("Email OTP and mobile OTP have been sent.");
   }
 
   async function onStartSignup(e: FormEvent) {
     e.preventDefault();
-    if (!email.trim()) {
-      setError("Email is required.");
-      return;
-    }
-    if (!phone.trim()) {
-      setError("Mobile number is required.");
-      return;
-    }
-
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
     try {
-      await sendEmailOtp();
+      await sendBothOtps();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send email OTP");
+      setError(err instanceof Error ? err.message : "Failed to start signup");
     } finally {
       setLoading(false);
     }
   }
 
-  async function onVerifyEmailOtp(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
+  async function onResendOtps() {
+    if (loading || countdown > 0) return;
+    resetNotices();
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/supabase/email-otp/verify", {
+      await sendBothOtps();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend OTP");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onVerifyOtps(e: FormEvent) {
+    e.preventDefault();
+    resetNotices();
+    setLoading(true);
+    try {
+      const response = await fetch("/api/customer-auth/signup/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
-          token: emailOtp,
-          next: "/signup",
-          intent: "signup",
+          signup_session_id: signupSessionId,
+          email_otp: emailOtp,
+          phone_otp: phoneOtp,
         }),
       });
-      const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
+      const payload = (await response.json().catch(() => ({}))) as ApiSuccessShape & ApiErrorShape;
       if (!response.ok) {
-        throw new Error(readErrorMessage(payload, "Email OTP verification failed"));
+        const err = readError(payload, "OTP verification failed");
+        setErrorCode(err.code);
+        throw new Error(err.message);
       }
-      setStep("mobile_verify");
-      setMessage("Email verified. Now verify your mobile number.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Email OTP verification failed");
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function onResendEmailOtp() {
-    if (countdown > 0 || loading) return;
-    setError(null);
-    setMessage(null);
-    setLoading(true);
-    try {
-      await sendEmailOtp();
+      setStep("password");
+      setMessage("Email and mobile verified. Set your password to finish signup.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend email OTP");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function sendMobileOtp() {
-    const response = await fetch("/api/customer-auth/phone-verification/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
-    if (!response.ok) {
-      throw new Error(readErrorMessage(payload, "Failed to send mobile OTP"));
-    }
-    setMobileSent(true);
-    setCountdown(60);
-    setMessage("Mobile OTP sent successfully.");
-  }
-
-  async function onSendMobileOtp(e: FormEvent) {
-    e.preventDefault();
-    if (!phone.trim()) {
-      setError("Mobile number is required.");
-      return;
-    }
-    setError(null);
-    setMessage(null);
-    setLoading(true);
-    try {
-      await sendMobileOtp();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send mobile OTP");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onResendMobileOtp() {
-    if (countdown > 0 || loading) return;
-    setError(null);
-    setMessage(null);
-    setLoading(true);
-    try {
-      await sendMobileOtp();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend mobile OTP");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onVerifyMobileOtp(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
-    setLoading(true);
-    try {
-      const response = await fetch("/api/customer-auth/phone-verification/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp: mobileOtp }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as ApiErrorShape;
-      if (!response.ok) {
-        throw new Error(readErrorMessage(payload, "Mobile OTP verification failed"));
-      }
-      setStep("set_password");
-      setMessage("Mobile verified. Set your password to finish account setup.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Mobile OTP verification failed");
+      setError(err instanceof Error ? err.message : "OTP verification failed");
     } finally {
       setLoading(false);
     }
@@ -251,32 +159,26 @@ function SignupContent() {
 
   async function onSetPassword(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    resetNotices();
     setLoading(true);
     try {
-      const passwordResponse = await fetch("/api/auth/supabase/password/set", {
+      const response = await fetch("/api/customer-auth/signup/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, confirmPassword }),
-      });
-      const passwordPayload = (await passwordResponse.json().catch(() => ({}))) as ApiErrorShape;
-      if (!passwordResponse.ok) {
-        throw new Error(readErrorMessage(passwordPayload, "Failed to set password"));
-      }
-
-      await fetch("/api/account/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: phone || null,
-          phone_verified: true,
-          profile_completed: false,
+          signup_session_id: signupSessionId,
+          password,
+          confirm_password: confirmPassword,
         }),
       });
+      const payload = (await response.json().catch(() => ({}))) as ApiSuccessShape & ApiErrorShape;
+      if (!response.ok) {
+        const err = readError(payload, "Failed to set password");
+        setErrorCode(err.code);
+        throw new Error(err.message);
+      }
 
-      setMessage("Account created successfully.");
-      window.location.href = nextPath || "/account/onboarding";
+      window.location.href = payload.data?.redirectTo || nextPath;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to complete signup");
     } finally {
@@ -285,19 +187,27 @@ function SignupContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:py-16">
         <div className="mx-auto flex max-w-md items-center justify-center">
           <Link href="/" aria-label="Yono DMC home">
             <Image src="/logo.png" alt="Yono DMC" width={190} height={58} className="h-14 w-auto" priority />
           </Link>
         </div>
 
-        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-          <h1 className="text-3xl font-semibold text-slate-900">Create account</h1>
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+          <h1 className="text-[34px] font-semibold tracking-tight text-slate-900">Create your customer account</h1>
           <p className="mt-2 text-sm text-slate-600">
-            First-time signup requires Email OTP, Mobile OTP, and password setup. You can complete profile details after login.
+            We verify email and mobile only once during account creation.
           </p>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-600">
+            <span className={step === "identity" ? "text-[#2563d7]" : ""}>Step 1: Contact</span>
+            <span className="mx-2 text-slate-300">/</span>
+            <span className={step === "verify" ? "text-[#2563d7]" : ""}>Step 2: Verify OTP</span>
+            <span className="mx-2 text-slate-300">/</span>
+            <span className={step === "password" ? "text-[#2563d7]" : ""}>Step 3: Set Password</span>
+          </div>
 
           {step === "identity" ? (
             <form onSubmit={onStartSignup} className="mt-5 space-y-3">
@@ -307,7 +217,7 @@ function SignupContent() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
               />
               <input
                 type="tel"
@@ -315,102 +225,59 @@ function SignupContent() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Mobile number (+91...)"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#199ce0] px-4 py-3 font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#2563d7] px-4 py-3 font-semibold text-white hover:bg-[#1d4fc2] disabled:opacity-60"
               >
                 {loading ? "Please wait..." : "Continue"}
               </button>
             </form>
           ) : null}
 
-          {step === "email_verify" ? (
-            <form onSubmit={onVerifyEmailOtp} className="mt-5 space-y-3">
-              <input
-                type="email"
-                value={email}
-                readOnly
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-600"
-              />
+          {step === "verify" ? (
+            <form onSubmit={onVerifyOtps} className="mt-5 space-y-3">
               <input
                 type="text"
                 required
                 value={emailOtp}
                 onChange={(e) => setEmailOtp(e.target.value)}
-                placeholder="6-digit Email OTP"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
+                placeholder="Email OTP"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
+              />
+              <input
+                type="text"
+                required
+                value={phoneOtp}
+                onChange={(e) => setPhoneOtp(e.target.value)}
+                placeholder="Mobile OTP"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#199ce0] px-4 py-3 font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#2563d7] px-4 py-3 font-semibold text-white hover:bg-[#1d4fc2] disabled:opacity-60"
               >
-                {loading ? "Please wait..." : "Verify Email OTP"}
+                {loading ? "Please wait..." : "Verify OTPs"}
               </button>
               {countdown > 0 ? (
                 <p className="text-center text-sm text-slate-600">Resend OTP in {countdown}s</p>
               ) : (
                 <button
                   type="button"
-                  onClick={() => void onResendEmailOtp()}
+                  onClick={() => void onResendOtps()}
                   disabled={loading}
-                  className="w-full text-sm font-semibold text-[#199ce0] hover:underline disabled:opacity-60"
+                  className="w-full text-sm font-semibold text-[#2563d7] hover:underline disabled:opacity-60"
                 >
-                  Resend Email OTP
+                  Resend OTP
                 </button>
               )}
             </form>
           ) : null}
 
-          {step === "mobile_verify" ? (
-            <form onSubmit={mobileSent ? onVerifyMobileOtp : onSendMobileOtp} className="mt-5 space-y-3">
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Mobile number (+91...)"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
-              />
-              {mobileSent ? (
-                <input
-                  type="text"
-                  required
-                  value={mobileOtp}
-                  onChange={(e) => setMobileOtp(e.target.value)}
-                  placeholder="6-digit Mobile OTP"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
-                />
-              ) : null}
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#199ce0] px-4 py-3 font-semibold text-white hover:opacity-90 disabled:opacity-60"
-              >
-                <Phone className="h-4 w-4" />
-                {loading ? "Please wait..." : mobileSent ? "Verify Mobile OTP" : "Send Mobile OTP"}
-              </button>
-              {mobileSent ? (
-                countdown > 0 ? (
-                  <p className="text-center text-sm text-slate-600">Resend OTP in {countdown}s</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void onResendMobileOtp()}
-                    disabled={loading}
-                    className="w-full text-sm font-semibold text-[#199ce0] hover:underline disabled:opacity-60"
-                  >
-                    Resend Mobile OTP
-                  </button>
-                )
-              ) : null}
-            </form>
-          ) : null}
-
-          {step === "set_password" ? (
+          {step === "password" ? (
             <form onSubmit={onSetPassword} className="mt-5 space-y-3">
               <input
                 type="password"
@@ -418,7 +285,7 @@ function SignupContent() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Create password"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
               />
               <input
                 type="password"
@@ -426,19 +293,38 @@ function SignupContent() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm password"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-[#199ce0] focus:ring-2 focus:ring-[#199ce0]/20"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-[#2563d7] focus:ring-2 focus:ring-[#2563d7]/20"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#199ce0] px-4 py-3 font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#2563d7] px-4 py-3 font-semibold text-white hover:bg-[#1d4fc2] disabled:opacity-60"
               >
                 {loading ? "Please wait..." : "Create account"}
               </button>
               <p className="text-xs text-slate-500">
-                Password must be at least 8 characters with uppercase, lowercase, and a number.
+                Password must be at least 8 characters and include uppercase, lowercase, and a number.
               </p>
             </form>
+          ) : null}
+
+          {error ? (
+            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          ) : null}
+          {errorCode === "ACCOUNT_EXISTS" ? (
+            <div className="mt-3">
+              <Link
+                href={`/login?next=${encodeURIComponent(nextPath)}`}
+                className="text-sm font-semibold text-[#2563d7] hover:underline"
+              >
+                Account already exists. Sign in.
+              </Link>
+            </div>
+          ) : null}
+          {message ? (
+            <p className="mt-4 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {message}
+            </p>
           ) : null}
 
           <div className="mt-5 text-sm">
@@ -446,15 +332,6 @@ function SignupContent() {
               Already have an account? Sign in
             </Link>
           </div>
-
-          {error ? (
-            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-          ) : null}
-          {message ? (
-            <p className="mt-4 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {message}
-            </p>
-          ) : null}
 
           <div className="mt-6 text-sm">
             <Link href="/" className="inline-flex items-center gap-2 font-semibold text-[#199ce0]">
@@ -475,3 +352,4 @@ export default function SignupPage() {
     </Suspense>
   );
 }
+

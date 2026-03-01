@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPublicBaseUrl } from "@/lib/auth/baseUrl";
-import { ensureIdentityProfile, getIdentityProfileByUserId } from "@/lib/auth/identityProfiles";
+import { ensureIdentityProfile } from "@/lib/auth/identityProfiles";
 import {
   applySupabaseSessionCookie,
   clearOAuthContextCookie,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/supabaseAuthProvider";
 import { getRequestId, safeLog } from "@/lib/system/requestContext";
 import { getCustomerProfileCompletionStatus } from "@/lib/backend/customerAccount";
+import { persistCustomerAuthState } from "@/lib/auth/customerAuthState";
 
 function loginErrorRedirect(baseUrl: string, code: string, requestId: string): NextResponse {
   const response = NextResponse.redirect(
@@ -83,11 +84,6 @@ export async function GET(req: Request) {
       return loginErrorRedirect(baseUrl, "google_token_exchange_failed", requestId);
     }
 
-    const existingProfile = await getIdentityProfileByUserId(userId);
-    if (!existingProfile && (!context.role || context.role === "customer")) {
-      return loginErrorRedirect(baseUrl, "google_account_not_registered", requestId);
-    }
-
     const profile = await ensureIdentityProfile({
       userId,
       role: context.role,
@@ -103,6 +99,16 @@ export async function GET(req: Request) {
 
     const role = profile?.role;
     const resolvedRole = role || context.role || "customer";
+    if (resolvedRole === "customer") {
+      const nowIso = new Date().toISOString();
+      await persistCustomerAuthState(userId, {
+        email: tokenPayload.user?.email || profile?.email || null,
+        phone: tokenPayload.user?.phone || profile?.phone || null,
+        authProvider: "google",
+        emailVerifiedAt: nowIso,
+        phoneVerifiedAt: tokenPayload.user?.phone || profile?.phone ? nowIso : null,
+      });
+    }
     let targetPath = postLoginPath(resolvedRole, context.nextPath);
     if (resolvedRole === "customer" && targetPath === "/my-trips") {
       const completed = await getCustomerProfileCompletionStatus(userId);
